@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: qs-template-api
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:qs_template_db}
+    username: ${DB_USER:quedena}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: public
+    open-in-view: false
+
+  flyway:
+    enabled: false   # each module runs its own Flyway instance with its own history table (see shared/config/FlywayConfig)
+
+server:
+  port: ${SERVER_PORT:8080}
+
+template:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:30}
+
+cors:
+  allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health   # only health — never expose env/beans/heapdump by default
+  endpoint:
+    health:
+      show-details: never   # UP/DOWN only; no infra details to an unauthenticated caller
