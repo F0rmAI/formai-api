@@ -69,16 +69,13 @@ class ArchitectureTest {
                 .resideInAnyPackage(
                         "studio.quedena.template.iam.domain..",
                         "studio.quedena.template.iam.application..",
-                        "studio.quedena.template.iam.infrastructure..",
-                        "studio.quedena.template.profiles.domain..",
-                        "studio.quedena.template.profiles.application..",
-                        "studio.quedena.template.profiles.infrastructure..")
+                        "studio.quedena.template.iam.infrastructure..")
                 .check(importedClasses);
     }
 
     // Naming — fachadas OHS (si se agregan) viven en interfaces.acl.
-    // allowEmptyShould(true): hoy ningún BC necesita fachada OHS (profiles solo
-    // consume el evento UserRegistered), la regla queda lista para cuando se agregue una.
+    // allowEmptyShould(true): hoy ningún BC necesita fachada OHS todavía — la regla
+    // queda lista para cuando se agregue una.
     @Test
     void contextFacadesResideInInterfacesAcl() {
         classes().that().haveSimpleNameEndingWith("ContextFacade")

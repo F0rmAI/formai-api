@@ -20,15 +20,4 @@ public class FlywayConfig {
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
     }
-
-    @Bean
-    public FlywayMigrationInitializer profilesFlywayMigrationInitializer(DataSource dataSource) {
-        var flyway = Flyway.configure()
-                .dataSource(dataSource)
-                .schemas("profiles")
-                .table("flyway_profiles_profiles")
-                .locations("classpath:db/migration/profiles")
-                .load();
-        return new FlywayMigrationInitializer(flyway, null);
-    }
 }
