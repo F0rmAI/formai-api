@@ -29,6 +29,11 @@ template:
 cors:
   allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
 
+documentation:
+  application:
+    description: QS backend template API
+    version: '@project.version@'
+
 management:
   endpoints:
     web:
