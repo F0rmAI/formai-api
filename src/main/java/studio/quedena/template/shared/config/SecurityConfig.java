@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/authentication/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()   // healthchecks send no JWT
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // TEMPLATE NOTE: roles are additive (iam.domain.model.valueobjects.Role) and
                         // land as ROLE_<name> authorities via JwtAuthenticationFilter. To restrict a
                         // route to a specific role, add a matcher BEFORE anyRequest().authenticated():
