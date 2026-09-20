@@ -1,9 +1,9 @@
 spring:
   application:
-    name: qs-template-api
+    name: formai-api
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:qs_template_db}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:qs_formai_db}
     username: ${DB_USER:quedena}
     password: ${DB_PASSWORD}
 
@@ -21,7 +21,7 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
-template:
+formai:
   jwt:
     secret: ${JWT_SECRET}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:30}
@@ -31,7 +31,7 @@ cors:
 
 documentation:
   application:
-    description: QS backend template API
+    description: 'FormAI API — modular monolith (Bounded Contexts: iam)'
     version: '@project.version@'
 
 management:

@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>studio.quedena</groupId>
-    <artifactId>qs-template-api</artifactId>
+    <groupId>com.formai</groupId>
+    <artifactId>formai-api</artifactId>
     <version>0.1.0</version>
-    <name>qs-template-api</name>
-    <description>QS backend template — monolito modular (Bounded Contexts: iam, profiles)</description>
+    <name>formai-api</name>
+    <description>FormAI API</description>
 
     <properties>
         <java.version>25</java.version>

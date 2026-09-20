@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_DB: ${DB_NAME:-qs_template_db}
+      POSTGRES_DB: ${DB_NAME:-qs_formai_db}
       POSTGRES_USER: ${DB_USER:-quedena}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:

@@ -1,14 +1,13 @@
-# QS Template API
+# FormAI API
 
-![CI](https://github.com/quedena-studio-ws/qs-template-api/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/F0rmAI/formai-api/actions/workflows/ci.yml/badge.svg)
 
 ## Summary
 
-QS Template API, the base template for Quedena Studio backend services, built with
-Java, the Spring Boot Framework, and Spring Data JPA on a PostgreSQL database,
-following Domain-Driven Design. Each bounded context lives as an internal module
-inside a single deployable, and contexts communicate in-process through domain
-events rather than over the network.
+FormAI API, built with Java, the Spring Boot Framework, and Spring Data JPA on a
+PostgreSQL database, following Domain-Driven Design. Each bounded context lives as
+an internal module inside a single deployable, and contexts communicate in-process
+through domain events rather than over the network.
 
 ## Features
 
@@ -47,7 +46,7 @@ the following features:
   `ROLE_<name>` authorities via `JwtAuthenticationFilter` — protect an endpoint with
   `.hasAuthority("ROLE_ADMINISTRATOR")` in `SecurityConfig` (see the example comment
   there). Add new roles by extending the `Role` enum; there is no built-in endpoint to
-  grant a role — a template consumer decides that flow when it derives a project.
+  grant a role — that flow is deliberately left for this project to add as needed.
 
 On successful registration it publishes the `UserRegistered` domain event, allowing
 other contexts to react in-process while IAM stays decoupled from them.
@@ -68,7 +67,7 @@ Lombok, Flyway, and the PostgreSQL driver are managed by the `spring-boot-starte
 ## Project Structure
 
 ```
-studio.quedena.template
+com.formai
 ├── iam/        Core — authentication. User aggregate (Email + HashedPassword VOs),
 │               issues its own JWT and publishes the UserRegistered event.
 └── shared/     Cross-cutting configuration (Flyway per module, JWT security).
@@ -95,13 +94,13 @@ cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64
 
 ```bash
 docker compose up -d   # starts PostgreSQL 17 only
-mvn spring-boot:run    # or run TemplateApplication from the IDE
+mvn spring-boot:run    # or run FormaiApplication from the IDE
 ```
 
 ## Git Workflow
 
 <p align="justify">
-This template follows a lightweight Git Flow. <code>main</code> only ever holds
+This project follows a lightweight Git Flow. <code>main</code> only ever holds
 deployable code — nobody pushes to it directly, and no work happens on it beyond
 merging a finished <code>release/*</code> (or an urgent <code>hotfix/*</code>). Every
 merge into <code>main</code> is a deploy trigger, so it stays tagged with the version
@@ -147,9 +146,8 @@ develop      ●───●───────●───●───●─�
 ```
 
 <p align="justify">
-This template ships with only <code>main</code>, since a template has no in-flight work
-to integrate. Every project generated from it should create <code>develop</code> right
-away — <code>git checkout -b develop && git push -u origin develop</code> — before
+This repository currently ships with only <code>main</code>. Create <code>develop</code>
+right away — <code>git checkout -b develop && git push -u origin develop</code> — before
 opening the first <code>feature/*</code> branch. <code>main</code> is protected: it only
 accepts pull requests, each requiring the CI <code>build</code> job to pass.
 </p>
@@ -194,9 +192,8 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 
 ## Error Handling
 
-Unexpected exceptions (anything not mapped by a module's own `ControllerAdvice`, e.g.
-`AuthenticationControllerAdvice`) are caught by
-`shared/interfaces/rest/GlobalExceptionHandler`, which returns a generic `500` body —
+Unexpected exceptions (anything not mapped by a module's own `ControllerAdvice`, if one
+is added) are caught by `shared/interfaces/rest/GlobalExceptionHandler`, which returns a generic `500` body —
 never the exception message or stack trace — while logging the real cause server-side.
 Spring MVC's own well-known exceptions (malformed JSON, validation errors, wrong HTTP
 method) keep their correct `4xx` status untouched.
@@ -208,7 +205,7 @@ mvn test -Dtest=ArchitectureTest   # module boundaries (ArchUnit) — no Postgre
 mvn test                           # full suite — requires Postgres (docker compose up -d)
 ```
 
-This template does not currently ship a worked test example per layer — `ArchitectureTest`
+This project does not currently ship a worked test example per layer — `ArchitectureTest`
 is the only test — so there is nothing to copy from yet when adding a new module.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
