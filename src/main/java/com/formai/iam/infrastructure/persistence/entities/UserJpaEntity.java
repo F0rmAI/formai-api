@@ -3,6 +3,7 @@ package com.formai.iam.infrastructure.persistence.entities;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -24,7 +25,7 @@ public class UserJpaEntity {
     @Column(nullable = false, unique = true, length = 320)
     private String email;
 
-    @Column(name = "hashed_password", nullable = false)
+    @Column(name = "hashed_password")
     private String hashedPassword;
 
     // Stored as plain strings, not the domain Role type: this entity stays framework-only
@@ -33,6 +34,24 @@ public class UserJpaEntity {
     @CollectionTable(name = "user_roles", schema = "iam", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", nullable = false)
     private Set<String> roles = new HashSet<>();
+
+    @Column(nullable = false, length = 30)
+    private String status;
+
+    @Column(name = "failed_sign_in_count", nullable = false)
+    private int failedSignInCount;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Embedded
+    private ActivationCodeEmbeddable activationCode;
+
+    @Embedded
+    private PasswordResetTokenEmbeddable passwordResetToken;
+
+    @Column(name = "data_consent_accepted_at")
+    private Instant dataConsentAcceptedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -71,6 +90,54 @@ public class UserJpaEntity {
 
     public void setRoles(Set<String> roles) {
         this.roles = roles;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public int getFailedSignInCount() {
+        return failedSignInCount;
+    }
+
+    public void setFailedSignInCount(int failedSignInCount) {
+        this.failedSignInCount = failedSignInCount;
+    }
+
+    public Instant getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(Instant lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public ActivationCodeEmbeddable getActivationCode() {
+        return activationCode;
+    }
+
+    public void setActivationCode(ActivationCodeEmbeddable activationCode) {
+        this.activationCode = activationCode;
+    }
+
+    public PasswordResetTokenEmbeddable getPasswordResetToken() {
+        return passwordResetToken;
+    }
+
+    public void setPasswordResetToken(PasswordResetTokenEmbeddable passwordResetToken) {
+        this.passwordResetToken = passwordResetToken;
+    }
+
+    public Instant getDataConsentAcceptedAt() {
+        return dataConsentAcceptedAt;
+    }
+
+    public void setDataConsentAcceptedAt(Instant dataConsentAcceptedAt) {
+        this.dataConsentAcceptedAt = dataConsentAcceptedAt;
     }
 
     public Instant getCreatedAt() {

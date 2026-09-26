@@ -1,20 +1,29 @@
 package com.formai.iam.infrastructure.persistence.transform;
 
 import com.formai.iam.domain.model.aggregates.User;
+import com.formai.iam.domain.model.valueobjects.ConsentAcceptance;
 import com.formai.iam.domain.model.valueobjects.Email;
 import com.formai.iam.domain.model.valueobjects.HashedPassword;
 import com.formai.iam.domain.model.valueobjects.Role;
 import com.formai.iam.infrastructure.persistence.entities.UserJpaEntity;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
+import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
 public interface UserJpaMapper {
 
+    @Mapping(target = "failedSignInCount", source = "failedSignIns.count")
+    @Mapping(target = "lockedUntil", source = "failedSignIns.lockedUntil")
+    @Mapping(target = "dataConsentAcceptedAt", source = "dataConsent")
     UserJpaEntity toEntity(User user);
 
+    @Mapping(target = "failedSignIns.count", source = "failedSignInCount")
+    @Mapping(target = "failedSignIns.lockedUntil", source = "lockedUntil")
+    @Mapping(target = "dataConsent", source = "dataConsentAcceptedAt")
     User toDomain(UserJpaEntity entity);
 
     // required by MapStruct: single-field VOs need an explicit converter.
@@ -32,6 +41,14 @@ public interface UserJpaMapper {
 
     default HashedPassword mapHashedPassword(String value) {
         return value == null ? null : new HashedPassword(value);
+    }
+
+    default Instant map(ConsentAcceptance consentAcceptance) {
+        return consentAcceptance == null ? null : consentAcceptance.acceptedAt();
+    }
+
+    default ConsentAcceptance mapConsentAcceptance(Instant acceptedAt) {
+        return acceptedAt == null ? null : new ConsentAcceptance(acceptedAt);
     }
 
     default Set<String> mapRoles(Set<Role> roles) {

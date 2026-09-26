@@ -7,6 +7,7 @@ import com.formai.iam.infrastructure.persistence.transform.UserJpaMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class UserRepositoryImpl implements UserRepository {
@@ -34,5 +35,20 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public boolean existsByEmail(Email email) {
         return jpaRepository.existsByEmail(email.value());
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByActivationCode(String code) {
+        return jpaRepository.findByActivationCode(code).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByPasswordResetTokenHash(String tokenHash) {
+        return jpaRepository.findByPasswordResetTokenHash(tokenHash).map(mapper::toDomain);
     }
 }
