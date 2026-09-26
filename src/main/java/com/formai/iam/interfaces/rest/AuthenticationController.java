@@ -3,6 +3,7 @@ package com.formai.iam.interfaces.rest;
 import com.formai.iam.application.internal.outboundservices.tokens.TokenService;
 import com.formai.iam.domain.exceptions.InvalidCredentialsException;
 import com.formai.iam.domain.services.UserCommandService;
+import com.formai.iam.interfaces.rest.resources.AuthenticatedUserResource;
 import com.formai.iam.interfaces.rest.resources.SignInResource;
 import com.formai.iam.interfaces.rest.resources.SignUpResource;
 import com.formai.iam.interfaces.rest.resources.UserResource;
@@ -51,16 +52,18 @@ public class AuthenticationController {
         this.cookieFactory = cookieFactory;
     }
 
-    @Operation(summary = "Register a new account",
-            description = "Creates a user with a securely hashed password and the default " +
-                    "REGISTERED_USER role. Does not sign the account in — call sign-in " +
-                    "afterwards to obtain the JWT cookie.")
+    @Operation(summary = "Register a new trainer account",
+            description = "Creates an active trainer account (REGISTERED_USER and TRAINER roles) " +
+                    "with a securely hashed password. Does not sign the account in — call " +
+                    "sign-in afterwards to obtain the JWT cookie.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Account created",
                     content = @Content(schema = @Schema(implementation = UserResource.class))),
-            @ApiResponse(responseCode = "400", description = "Malformed email or password shorter than 8 characters",
+            @ApiResponse(responseCode = "400", description = "Missing full name, malformed email or blank password",
                     content = @Content),
             @ApiResponse(responseCode = "409", description = "An account with this email already exists",
+                    content = @Content),
+            @ApiResponse(responseCode = "422", description = "Password is not between 8 and 128 characters long",
                     content = @Content)
     })
     @SecurityRequirements
@@ -76,7 +79,7 @@ public class AuthenticationController {
     // (see JwtCookieFactory) so client-side JavaScript — and therefore XSS — can
     // never read it. The browser attaches it automatically on later requests.
     @Operation(summary = "Authenticate and issue a JWT",
-            description = "Verifies the credentials and sets the JWT as an httpOnly, " +
+            description = "Verifies the credentials and the client application, and sets the JWT as an httpOnly, " +
                     "SameSite=Lax cookie on the response. A browser client on a different " +
                     "origin must send the request with credentials included for the cookie " +
                     "to be stored (see CorsConfig).")
@@ -85,22 +88,28 @@ public class AuthenticationController {
                     headers = @Header(name = HttpHeaders.SET_COOKIE,
                             description = "httpOnly, Secure, SameSite=Lax JWT cookie (see JwtCookieFactory)",
                             schema = @Schema(type = "string")),
-                    content = @Content(schema = @Schema(implementation = UserResource.class))),
-            @ApiResponse(responseCode = "400", description = "Malformed email or blank password",
+                    content = @Content(schema = @Schema(implementation = AuthenticatedUserResource.class))),
+            @ApiResponse(responseCode = "400", description = "Malformed email, blank password or unknown application",
                     content = @Content),
             @ApiResponse(responseCode = "401", description = "Invalid credentials — same generic message " +
                     "whether the email doesn't exist or the password is wrong, to prevent user enumeration",
+                    content = @Content),
+            @ApiResponse(responseCode = "403", description = "The account cannot sign in from this application " +
+                    "(clients use the mobile app; trainers and administrators use the web platform)",
+                    content = @Content),
+            @ApiResponse(responseCode = "429", description = "Account locked for 15 minutes after 5 failed attempts",
                     content = @Content)
     })
     @SecurityRequirements
     @PostMapping("/sign-in")
-    public ResponseEntity<UserResource> signIn(@Valid @RequestBody SignInResource resource, HttpServletResponse response) {
+    public ResponseEntity<AuthenticatedUserResource> signIn(@Valid @RequestBody SignInResource resource,
+                                                            HttpServletResponse response) {
         var command = assembler.toCommand(resource);
         var user = userCommandService.handle(command)
                 .orElseThrow(InvalidCredentialsException::new);
         var token = tokenService.issueFor(user.getId().toString(), user.getRoles());
         response.addHeader(HttpHeaders.SET_COOKIE, cookieFactory.issue(token).toString());
-        return ResponseEntity.ok(assembler.toResource(user));
+        return ResponseEntity.ok(assembler.toAuthenticatedResource(user));
     }
 
     // JS cannot delete an httpOnly cookie itself, so ending a session server-side

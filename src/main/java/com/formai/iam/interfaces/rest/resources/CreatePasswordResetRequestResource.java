@@ -3,8 +3,4 @@ package com.formai.iam.interfaces.rest.resources;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-public record SignUpResource(
-        @NotBlank String fullName,
-        @NotBlank @Email String email,
-        @NotBlank String password
-) { }
+public record CreatePasswordResetRequestResource(@NotBlank @Email String email) { }
