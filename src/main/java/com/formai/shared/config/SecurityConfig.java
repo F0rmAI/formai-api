@@ -2,6 +2,7 @@ package com.formai.shared.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -26,6 +27,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/authentication/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/account-activations",
+                                "/api/v1/password-reset-requests",
+                                "/api/v1/password-resets").permitAll()
                         .requestMatchers("/actuator/health").permitAll()   // healthchecks send no JWT
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Roles are additive (iam.domain.model.valueobjects.Role) and land as
