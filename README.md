@@ -13,7 +13,9 @@ through domain events rather than over the network.
 
 - RESTful API
 - Domain-Driven Design (modular monolith)
-- Own JWT authentication (locally issued by the IAM module)
+- Own JWT authentication (locally issued by the IAM module, carried in an httpOnly cookie)
+- Role- and channel-aware sign-in (trainers on the web platform, clients on the mobile app)
+- Account lockout, client activation codes and password recovery
 - Spring Boot Framework
 - Spring Data JPA
 - Bean Validation
@@ -22,7 +24,8 @@ through domain events rather than over the network.
 - In-process Domain Events
 - ArchUnit boundary enforcement
 - Health endpoint (Spring Boot Actuator)
-- Global fallback exception handler
+- RFC 7807 `ProblemDetail` error responses and a global fallback exception handler
+- Interactive API documentation (springdoc-openapi / Swagger UI)
 - Continuous Integration (GitHub Actions)
 - Git Flow branching strategy (`main` protected, `develop`, `feature/*`, `release/*`)
 
@@ -33,23 +36,49 @@ its own domain, application, infrastructure, and interfaces layers.
 
 ### Identity and Access Management (IAM) Context
 
-The IAM Context is responsible for user registration and authentication. It includes
-the following features:
+The IAM Context owns every FormAI account (trainers and clients) and how they get in:
 
-- Register a new user (sign-up) with a securely hashed password.
-- Authenticate a user (sign-in) and issue a locally signed JWT.
-- Enforce unique email addresses across accounts.
-- Role-based access control (RBAC) with accumulable roles (`REGISTERED_USER`,
-  `ADMINISTRATOR`). Roles are additive, not exclusive — an account can hold both at
-  once. Every new account gets `REGISTERED_USER` by default; granting `ADMINISTRATOR`
-  never removes it. Roles travel in the JWT `roles` claim and land as
-  `ROLE_<name>` authorities via `JwtAuthenticationFilter` — protect an endpoint with
-  `.hasAuthority("ROLE_ADMINISTRATOR")` in `SecurityConfig` (see the example comment
-  there). Add new roles by extending the `Role` enum; there is no built-in endpoint to
-  grant a role — that flow is deliberately left for this project to add as needed.
+- **Trainer sign-up** with email, full name and a password (8–128 characters), stored as
+  a BCrypt hash. The account is created `ACTIVE` with the `REGISTERED_USER` and `TRAINER`
+  roles.
+- **Sign-in per client application.** Clients sign in only from the mobile app
+  (`MOBILE_APP`); trainers and administrators only from the web platform (`WEB_PLATFORM`).
+  Any other combination answers `403`. Wrong credentials always answer the same `401`,
+  whether the email exists or not.
+- **Account lockout.** The fifth consecutive failed sign-in locks the account for 15
+  minutes (`429`). A successful sign-in resets the counter.
+- **Sign-out** clears the httpOnly JWT cookie server-side.
+- **Client accounts with activation codes.** A trainer creates a client account
+  `PENDING_ACTIVATION` with a one-time, 8-character code valid for 72 hours, shown on screen
+  and shared by hand. Reissuing a code replaces the previous one. The client activates the
+  account with the code, a password and the personal data processing consent.
+- **Password reset by email.** A request issues a one-time link token valid for 30
+  minutes, and only its SHA-256 hash is stored. The request always answers the same
+  message, whether the email exists or not.
+- **Accumulable roles** (`REGISTERED_USER`, `TRAINER`, `CLIENT`, `ADMINISTRATOR`) travel in
+  the JWT `roles` claim and land as `ROLE_<name>` authorities via `JwtAuthenticationFilter`.
+  Protect an endpoint with `.hasAuthority("ROLE_<name>")` in `SecurityConfig`.
 
-On successful registration it publishes the `UserRegistered` domain event, allowing
-other contexts to react in-process while IAM stays decoupled from them.
+Other contexts reach IAM only through its Open Host Service,
+`iam.interfaces.acl.IamContextFacade`, which speaks neutral types and the
+`shared.contracts.iam.AccountActivationSummary` record:
+
+| Facade method | Purpose |
+|---|---|
+| `createClientAccount(email)` | Create a pending client account and return its activation code |
+| `reissueActivationCode(userId)` | Replace the activation code of a pending client |
+| `disableAccount(userId)` | Disable an account so it can no longer sign in |
+| `fetchAccountStatus(userId)` | Read the account status (`PENDING_ACTIVATION`, `ACTIVE`, `DISABLED`) |
+
+IAM publishes these in-process domain events:
+
+| Event | Published when | Intended consumer |
+|---|---|---|
+| `UserRegistered` | A trainer signs up (carries full name and email) | clients context |
+| `AccountActivated` | A client activates the account | clients context |
+| `PasswordResetRequested` | A password reset link is issued (carries the raw token) | notifications context |
+| `ActivationCodeIssued` | An activation code is created or reissued | audit only |
+| `AccountLocked` | An account gets locked after failed sign-ins | audit only |
 
 ## Technology Stack
 
@@ -60,6 +89,7 @@ other contexts to react in-process while IAM stays decoupled from them.
 | Persistence | Spring Data JPA · PostgreSQL 17 · Flyway |
 | Mapping | MapStruct 1.6.3 |
 | Security | Spring Security · JWT (jjwt 0.12.6) |
+| API documentation | springdoc-openapi 2.9.1 (Swagger UI) |
 | Architecture tests | ArchUnit 1.4.1 |
 
 Lombok, Flyway, and the PostgreSQL driver are managed by the `spring-boot-starter-parent` BOM.
@@ -68,13 +98,20 @@ Lombok, Flyway, and the PostgreSQL driver are managed by the `spring-boot-starte
 
 ```
 com.formai
-├── iam/        Core — authentication. User aggregate (Email + HashedPassword VOs),
-│               issues its own JWT and publishes the UserRegistered event.
-└── shared/     Cross-cutting configuration (Flyway per module, JWT security).
+├── iam/                  Identity and Access Management (generic subdomain)
+│   ├── domain/           User aggregate, ActivationCode and PasswordResetToken entities,
+│   │                     value objects, commands, queries, events, exceptions
+│   ├── application/      UserCommandServiceImpl, UserQueryServiceImpl, hashing and JWT
+│   │                     outbound services, IamContextFacadeImpl (OHS implementation)
+│   ├── infrastructure/   UserJpaEntity with embeddables, Spring Data repository, MapStruct mapper
+│   └── interfaces/       REST controllers, resources, assembler, advices, IamContextFacade (OHS)
+└── shared/               Cross-cutting: security, JWT cookie, CORS, Flyway per module,
+                          OpenAPI, global exception handler, inter-module contracts
 ```
 
-`iam` is currently the only bounded context; `UserRegistered` is published in-process
-for any future context to react to, without `iam` depending on them.
+`iam` is currently the only bounded context. The `clients` and `notifications` contexts
+will consume it through `IamContextFacade` and its domain events, without `iam`
+depending on them.
 
 ## Getting Started
 
@@ -96,6 +133,42 @@ cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64
 docker compose up -d   # starts PostgreSQL 17 only
 mvn spring-boot:run    # or run FormaiApplication from the IDE
 ```
+
+The API listens on `http://localhost:8080`; `GET /actuator/health` answers `{"status":"UP"}`
+once it is ready.
+
+### Exploring the API with Swagger UI
+
+Open `http://localhost:8080/swagger-ui/index.html` (raw spec at `/v3/api-docs`). Operations
+are grouped by tag:
+
+| Tag | Operations |
+|---|---|
+| Authentication | sign-up, sign-in, sign-out |
+| Clients | client account activation |
+| Password Recovery | request a reset link, reset the password |
+
+Sign in with **Try it out** on `POST /api/v1/authentication/sign-in` (use
+`"application": "WEB_PLATFORM"` for a trainer). The browser stores the httpOnly JWT cookie
+and sends it automatically on every later call; it does not appear in Swagger UI, but it is
+visible in the browser DevTools under Application → Cookies. Use Chrome or Firefox: both
+accept `Secure` cookies on `http://localhost`.
+
+### Troubleshooting
+
+**`required a bean of type 'UserJpaMapper' that could not be found`** while `mvn test`
+passes: the IDE is recompiling MapStruct's generated sources into `target/classes`,
+overwriting the classes Maven produced. Check it with:
+
+```bash
+javap -v target/classes/com/formai/iam/infrastructure/persistence/transform/UserJpaMapperImpl.class \
+  | grep -c "Unresolved compilation"   # must print 0
+```
+
+In VS Code (Java extension), let Maven alone run annotation processing: add
+`.settings/org.eclipse.m2e.apt.prefs` with `org.eclipse.m2e.apt.mode=disabled`, set
+`org.eclipse.jdt.apt.aptEnabled=false`, and remove the `target/generated-*` entries from
+`.classpath`. These IDE files are git-ignored, so this is a one-time local setup.
 
 ## Git Workflow
 
@@ -156,7 +229,9 @@ accepts pull requests, each requiring the CI <code>build</code> job to pass.
 
 JWT authentication is enabled by default (`shared/config/SecurityConfig`), in every
 environment — there is no permit-all development mode. `/api/v1/authentication/**`
-stays public (sign-up/sign-in/sign-out); every other endpoint requires a valid JWT.
+stays public (sign-up/sign-in/sign-out), as do `POST` on `/api/v1/account-activations`,
+`/api/v1/password-reset-requests` and `/api/v1/password-resets`; every other endpoint
+requires a valid JWT.
 
 The JWT never travels in the response body or a header the client sets manually: on
 sign-in, it's set as an **httpOnly, `SameSite=Lax` cookie** (`shared/config/JwtCookieFactory`),
@@ -173,27 +248,36 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 
 ### OWASP coverage (SSDLC)
 
-- **A02 (Cryptographic Failures):** BCrypt password hashing, signed JWT (never `alg: none`).
+- **A02 (Cryptographic Failures):** BCrypt password hashing (SHA-256 pre-hash so passwords up
+  to 128 characters fit BCrypt's 72-byte limit), signed JWT (never `alg: none`). Password
+  reset tokens are stored only as SHA-256 hashes.
 - **A03 (Injection):** Spring Data JPA plus Bean Validation at the edge, no concatenated SQL.
 - **A04 (Insecure Design):** sign-in returns a single generic error, never revealing whether the
-  email exists or the password was wrong (prevents user enumeration).
+  email exists or the password was wrong, and a password reset request always answers the
+  same message (prevents user enumeration).
 - **A08 (Logging Failures):** failed sign-in attempts are logged without the password.
-- **A10 (Authentication Attacks):** stateless, short-lived JWT. MFA and rate-limiting are out of
-  scope for now (they require infrastructure not included here).
+- **A10 (Authentication Attacks):** stateless, short-lived JWT, and account lockout for 15
+  minutes after 5 consecutive failed sign-ins. MFA is out of scope for now.
 
 ## API Endpoints
 
-| Method | Path | Auth |
-|---|---|---|
-| `POST` | `/api/v1/authentication/sign-up` | No |
-| `POST` | `/api/v1/authentication/sign-in` | No |
-| `POST` | `/api/v1/authentication/sign-out` | No |
-| `GET`  | `/actuator/health` | No |
+| Method | Path | Swagger tag | Success | Errors | Auth |
+|---|---|---|---|---|---|
+| `POST` | `/api/v1/authentication/sign-up` | Authentication | `201` | `400` `409` `422` | No |
+| `POST` | `/api/v1/authentication/sign-in` | Authentication | `200` + JWT cookie | `400` `401` `403` `429` | No |
+| `POST` | `/api/v1/authentication/sign-out` | Authentication | `204` | — | No |
+| `POST` | `/api/v1/account-activations` | Clients | `201` | `400` `422` | No |
+| `POST` | `/api/v1/password-reset-requests` | Password Recovery | `201` | `400` | No |
+| `POST` | `/api/v1/password-resets` | Password Recovery | `201` | `400` `422` | No |
+| `GET`  | `/actuator/health` | — | `200` | — | No |
 
 ## Error Handling
 
-Unexpected exceptions (anything not mapped by a module's own `ControllerAdvice`, if one
-is added) are caught by `shared/interfaces/rest/GlobalExceptionHandler`, which returns a generic `500` body —
+Each module maps its own domain exceptions to `ProblemDetail` responses in a
+`ControllerAdvice` with `@Order(Ordered.HIGHEST_PRECEDENCE)`. Unexpected exceptions
+(anything not mapped by a module's own `ControllerAdvice`) are caught by
+`shared/interfaces/rest/GlobalExceptionHandler` (`@Order(Ordered.LOWEST_PRECEDENCE)`),
+which returns a generic `500` body —
 never the exception message or stack trace — while logging the real cause server-side.
 Spring MVC's own well-known exceptions (malformed JSON, validation errors, wrong HTTP
 method) keep their correct `4xx` status untouched.
@@ -201,12 +285,17 @@ method) keep their correct `4xx` status untouched.
 ## Testing
 
 ```bash
-mvn test -Dtest=ArchitectureTest   # module boundaries (ArchUnit) — no Postgres needed
-mvn test                           # full suite — requires Postgres (docker compose up -d)
+mvn test -Dtest=ArchitectureTest   # module boundaries (ArchUnit)
+mvn test                           # full suite
 ```
 
-This project does not currently ship a worked test example per layer — `ArchitectureTest`
-is the only test — so there is nothing to copy from yet when adding a new module.
+No test needs a running database. The IAM module ships a worked example per layer to
+copy when adding a new module: `UserTest` (domain), `UserCommandServiceImplTest` and
+`UserQueryServiceImplTest` (application), `IamContextFacadeImplTest` (OHS facade),
+`UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
+the real `SecurityConfig`.
+
+The suite has 85 tests across every layer of `iam` plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
 every push and pull request to `main`, `develop`, and `release/**` — see
