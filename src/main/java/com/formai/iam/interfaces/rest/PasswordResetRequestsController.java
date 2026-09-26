@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Password Recovery", description = "Request a one-time password reset link by email.")
+@Tag(name = "Password Recovery", description = "Recover account access: request a one-time reset link " +
+        "by email, then set a new password with its token.")
 @RestController
 @RequestMapping("/api/v1/password-reset-requests")
 public class PasswordResetRequestsController {
