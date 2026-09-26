@@ -154,22 +154,6 @@ and sends it automatically on every later call; it does not appear in Swagger UI
 visible in the browser DevTools under Application → Cookies. Use Chrome or Firefox: both
 accept `Secure` cookies on `http://localhost`.
 
-### Troubleshooting
-
-**`required a bean of type 'UserJpaMapper' that could not be found`** while `mvn test`
-passes: the IDE is recompiling MapStruct's generated sources into `target/classes`,
-overwriting the classes Maven produced. Check it with:
-
-```bash
-javap -v target/classes/com/formai/iam/infrastructure/persistence/transform/UserJpaMapperImpl.class \
-  | grep -c "Unresolved compilation"   # must print 0
-```
-
-In VS Code (Java extension), let Maven alone run annotation processing: add
-`.settings/org.eclipse.m2e.apt.prefs` with `org.eclipse.m2e.apt.mode=disabled`, set
-`org.eclipse.jdt.apt.aptEnabled=false`, and remove the `target/generated-*` entries from
-`.classpath`. These IDE files are git-ignored, so this is a one-time local setup.
-
 ## Git Workflow
 
 <p align="justify">
