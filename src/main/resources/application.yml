@@ -29,9 +29,14 @@ formai:
 cors:
   allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
 
+tracking:
+  jobs:
+    workout-session-daily:
+      cron: ${TRACKING_DAILY_JOB_CRON:0 5 0 * * *}   # every day at 00:05 (server time zone)
+
 documentation:
   application:
-    description: 'FormAI API — modular monolith (Bounded Contexts: iam)'
+    description: 'FormAI API — modular monolith (Bounded Contexts: iam, planning, tracking)'
     version: '@project.version@'
 
 management:
