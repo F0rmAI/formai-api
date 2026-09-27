@@ -7,7 +7,7 @@
 FormAI API, built with Java, the Spring Boot Framework, and Spring Data JPA on a
 PostgreSQL database, following Domain-Driven Design. Each bounded context lives as
 an internal module inside a single deployable, and contexts communicate in-process
-through domain events rather than over the network.
+through Open Host Services and domain events rather than over the network.
 
 ## Features
 
@@ -16,6 +16,10 @@ through domain events rather than over the network.
 - Own JWT authentication (locally issued by the IAM module, carried in an httpOnly cookie)
 - Role- and channel-aware sign-in (trainers on the web platform, clients on the mobile app)
 - Account lockout, client activation codes and password recovery
+- Trainer client management with body profiles and weight history
+- Exercise catalog, versioned routines and routine assignments
+- Workout logging with compliance status, history, progress reports and progress charts
+- Scheduled daily job that schedules today's sessions and skips overdue ones
 - Spring Boot Framework
 - Spring Data JPA
 - Bean Validation
@@ -57,7 +61,8 @@ The IAM Context owns every FormAI account (trainers and clients) and how they ge
   message, whether the email exists or not.
 - **Accumulable roles** (`REGISTERED_USER`, `TRAINER`, `CLIENT`, `ADMINISTRATOR`) travel in
   the JWT `roles` claim and land as `ROLE_<name>` authorities via `JwtAuthenticationFilter`.
-  Protect an endpoint with `.hasAuthority("ROLE_<name>")` in `SecurityConfig`.
+  `SecurityConfig` restricts trainer routes to `ROLE_TRAINER` and client routes to
+  `ROLE_CLIENT`.
 
 Other contexts reach IAM only through its Open Host Service,
 `iam.interfaces.acl.IamContextFacade`, which speaks neutral types and the
@@ -79,6 +84,73 @@ IAM publishes these in-process domain events:
 | `PasswordResetRequested` | A password reset link is issued (carries the raw token) | notifications context |
 | `ActivationCodeIssued` | An activation code is created or reissued | audit only |
 | `AccountLocked` | An account gets locked after failed sign-ins | audit only |
+
+### Clients Context
+
+The Clients Context is responsible for the trainer's clients and their data for planning. It
+includes the following features:
+
+- Register a client as `INVITED` and show a 72-hour activation code on screen.
+- Renew the activation code of a client who has not activated the account yet.
+- List, search by name and filter by status the trainer's own clients; rename a client.
+- Deactivate a client: the account can no longer sign in and the history is kept.
+- Record the body profile (goal, height between 100 and 250 cm, weight above 0 kg,
+  restrictions), keeping every weight change with its date.
+
+It also exposes an Open Host Service (OHS) for in-process communication with other contexts,
+`clients.interfaces.acl.ClientsContextFacade`, offering the following capabilities:
+
+- Fetch one of a trainer's clients, returning a `ClientSummary` or empty.
+- Fetch a page of a trainer's clients, returning a `ClientSummaryPage`.
+
+It relies on an anti-corruption layer (ACL) to consume the IAM Context, translating its
+contract into this context's own model. It reacts to the `UserRegistered` domain event
+published by the IAM Context to register the trainer, and to `AccountActivated` to make the
+client `ACTIVE`, keeping both contexts decoupled. It publishes `ClientDeactivated`.
+
+### Planning Context
+
+The Planning Context is responsible for the trainer's exercises, routines and assignments. It
+includes the following features:
+
+- Keep an exercise catalog per trainer; an exercise used by a routine can only be archived,
+  and an archived exercise can be restored.
+- Create routines with sessions and prescribed exercises (sets, reps, target load, rest),
+  starting as `DRAFT`, and duplicate them.
+- Revise a routine: every change adds a version with its date and author.
+- Assign a routine to one or several active clients from a start date, closing the previous
+  assignment. A routine with no open assignment becomes `CLOSED` and can be assigned again
+  without duplicating it.
+
+It also exposes an Open Host Service (OHS) for in-process communication with other contexts,
+`planning.interfaces.acl.PlanningContextFacade`, offering the following capabilities:
+
+- Fetch a client's current routine, returning an `ActiveRoutineSnapshot` at its latest version.
+
+It relies on an anti-corruption layer (ACL) to consume the Clients Context, translating its
+contract into this context's own model. It reacts to the `ClientDeactivated` domain event
+published by the Clients Context to close the client's assignment, keeping both contexts
+decoupled. It publishes `RoutineAssigned`, `RoutineUpdated` and `AssignmentClosed`.
+
+### Tracking Context
+
+The Tracking Context is responsible for what clients actually train and how they progress. It
+includes the following features:
+
+- Show the client's current routine and today's session, with every session's detail.
+- Record load and reps per set, correct a set without duplicating it, and finish a session as
+  `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED`.
+- Workout history, most recent first, with volume, per-set detail and a date filter, for the
+  client and for the client's trainer.
+- Trainer client list with each client's current routine and last workout date.
+- Progress report per period: adherence, sessions by status, and each exercise's heaviest load
+  and volume in its first and last session.
+- Progress chart per exercise over 4, 8 or 12 weeks, for the client and the trainer.
+
+It relies on an anti-corruption layer (ACL) to consume the Planning and Clients Contexts,
+translating their contracts into this context's own model. It reacts to the `RoutineAssigned`,
+`RoutineUpdated` and `AssignmentClosed` domain events published by the Planning Context to keep
+the client's current routine in sync, keeping both contexts decoupled.
 
 ## Technology Stack
 
@@ -105,13 +177,15 @@ com.formai.api
 │   │                     outbound services, IamContextFacadeImpl (OHS implementation)
 │   ├── infrastructure/   UserJpaEntity with embeddables, Spring Data repository, MapStruct mapper
 │   └── interfaces/       REST controllers, resources, assembler, advices, IamContextFacade (OHS)
+├── clients/              Clients (supporting subdomain) — trainers, clients, body profiles
+├── planning/             Planning (core subdomain) — exercises, routines, assignments
+├── tracking/             Tracking (core subdomain) — active routines, workout sessions, progress
 └── shared/               Cross-cutting: security, JWT cookie, CORS, Flyway per module,
                           OpenAPI, global exception handler, inter-module contracts
 ```
 
-`iam` is currently the only bounded context. The `clients` and `notifications` contexts
-will consume it through `IamContextFacade` and its domain events, without `iam`
-depending on them.
+Dependencies only point one way: `clients` consumes `iam`, `planning` consumes `clients`, and
+`tracking` consumes `planning` and `clients`, always through an OHS facade or a domain event.
 
 ## Getting Started
 
@@ -145,7 +219,13 @@ are grouped by tag:
 | Tag | Operations |
 |---|---|
 | Authentication | sign-up, sign-in, sign-out |
-| Clients | client account activation |
+| Clients | client registration, activation codes, deactivation, body profile; account activation |
+| Exercises | the trainer's exercise catalog |
+| Routines | routines, versions, duplicates, assignments |
+| Workouts | active routine, today's session, sets, completion, history |
+| Client overviews | the trainer's client list with routine and last workout |
+| Progress reports | adherence and exercise metrics for a period |
+| Progress charts | load and volume evolution for 4, 8 or 12 weeks |
 | Password Recovery | request a reset link, reset the password |
 
 Sign in with **Try it out** on `POST /api/v1/authentication/sign-in` (use
@@ -215,7 +295,10 @@ JWT authentication is enabled by default (`shared/config/SecurityConfig`), in ev
 environment — there is no permit-all development mode. `/api/v1/authentication/**`
 stays public (sign-up/sign-in/sign-out), as do `POST` on `/api/v1/account-activations`,
 `/api/v1/password-reset-requests` and `/api/v1/password-resets`; every other endpoint
-requires a valid JWT.
+requires a valid JWT. Trainer routes (`/clients/**`, `/exercises/**`, `/routines/**`,
+`/client-overviews/**`) also require `ROLE_TRAINER`, and client routes (`/active-routines/**`,
+`/workout-sessions/**`, `/progress-charts/**`) require `ROLE_CLIENT`; trainer data is always
+scoped to the signed-in trainer (`holderId` = JWT `sub`).
 
 The JWT never travels in the response body or a header the client sets manually: on
 sign-in, it's set as an **httpOnly, `SameSite=Lax` cookie** (`shared/config/JwtCookieFactory`),
@@ -253,6 +336,39 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 | `POST` | `/api/v1/account-activations` | Clients | `201` | `400` `422` | No |
 | `POST` | `/api/v1/password-reset-requests` | Password Recovery | `201` | `400` | No |
 | `POST` | `/api/v1/password-resets` | Password Recovery | `201` | `400` `422` | No |
+| `POST` | `/api/v1/clients` | Clients | `201` | `400` `403` `409` | Trainer |
+| `GET` | `/api/v1/clients?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}` | Clients | `200` | `403` `404` | Trainer |
+| `PUT` | `/api/v1/clients/{id}` | Clients | `200` | `400` `403` `404` | Trainer |
+| `POST` | `/api/v1/clients/{id}/deactivations` | Clients | `201` | `403` `404` | Trainer |
+| `POST` | `/api/v1/clients/{id}/activation-codes` | Clients | `201` | `403` `404` `409` | Trainer |
+| `GET` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `403` `404` | Trainer |
+| `PUT` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `400` `403` `404` `422` | Trainer |
+| `GET` | `/api/v1/clients/{id}/assignments` | Routines | `200` | `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress reports | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Trainer |
+| `POST` | `/api/v1/exercises` | Exercises | `201` | `400` `403` `409` | Trainer |
+| `GET` | `/api/v1/exercises?search&status&page&size` | Exercises | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/exercises/{id}` | Exercises | `200` | `403` `404` | Trainer |
+| `DELETE` | `/api/v1/exercises/{id}` | Exercises | `204` | `403` `404` `409` | Trainer |
+| `POST` | `/api/v1/exercises/{id}/archivals` | Exercises | `201` | `403` `404` | Trainer |
+| `POST` | `/api/v1/exercises/{id}/restorations` | Exercises | `201` | `403` `404` | Trainer |
+| `POST` | `/api/v1/routines` | Routines | `201` | `400` `403` `404` `422` | Trainer |
+| `GET` | `/api/v1/routines?page&size` | Routines | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/routines/{id}` | Routines | `200` | `403` `404` | Trainer |
+| `PUT` | `/api/v1/routines/{id}` | Routines | `200` | `400` `403` `404` `422` | Trainer |
+| `GET` | `/api/v1/routines/{id}/versions` | Routines | `200` | `403` `404` | Trainer |
+| `POST` | `/api/v1/routines/{id}/duplicates` | Routines | `201` | `400` `403` `404` | Trainer |
+| `POST` | `/api/v1/routines/{id}/assignments` | Routines | `201` | `400` `403` `404` `422` | Trainer |
+| `GET` | `/api/v1/client-overviews?search&status&page&size` | Client overviews | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/active-routines/me` | Workouts | `200` | `403` `404` | Client |
+| `GET` | `/api/v1/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Client |
+| `GET` | `/api/v1/workout-sessions/{id}` | Workouts | `200` | `403` `404` | Client |
+| `POST` | `/api/v1/workout-sessions/{id}/sets` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
+| `POST` | `/api/v1/workout-sessions/{id}/corrections` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
+| `POST` | `/api/v1/workout-sessions/{id}/completions` | Workouts | `201` | `403` `404` `409` | Client |
+| `GET` | `/api/v1/progress-charts/me?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Client |
 | `GET`  | `/actuator/health` | — | `200` | — | No |
 
 ## Error Handling
@@ -273,13 +389,14 @@ mvn test -Dtest=ArchitectureTest   # module boundaries (ArchUnit)
 mvn test                           # full suite
 ```
 
-No test needs a running database. The IAM module ships a worked example per layer to
-copy when adding a new module: `UserTest` (domain), `UserCommandServiceImplTest` and
+No test needs a running database. Every module has a test per layer; the IAM module is the
+reference to copy when adding a new one: `UserTest` (domain), `UserCommandServiceImplTest` and
 `UserQueryServiceImplTest` (application), `IamContextFacadeImplTest` (OHS facade),
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 85 tests across every layer of `iam` plus the ArchUnit boundary rules.
+The suite has 340 tests across every layer of `iam`, `clients`, `planning` and `tracking`, plus
+the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
 every push and pull request to `main`, `develop`, and `release/**` — see
