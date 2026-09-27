@@ -10,6 +10,8 @@ import com.formai.api.tracking.domain.services.ActiveRoutineQueryService;
 import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,18 @@ public class WorkoutSessionDailyJob {
     @Scheduled(cron = "${tracking.jobs.workout-session-daily.cron}")
     public void run() {
         runFor(LocalDate.now());
+    }
+
+    // Catch-up: if the application was down when the cron fired, today's sessions still get
+    // scheduled. runFor is idempotent, so running it again on the same day changes nothing.
+    // A failure here must not stop the application: Spring Boot aborts startup on it.
+    @EventListener(ApplicationReadyEvent.class)
+    public void runOnStartup() {
+        try {
+            run();
+        } catch (RuntimeException ex) {
+            log.error("Could not run the workout session catch-up on startup", ex);
+        }
     }
 
     public void runFor(LocalDate today) {
