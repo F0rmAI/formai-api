@@ -1,0 +1,69 @@
+package com.formai.api.tracking.application.internal.eventhandlers;
+
+import com.formai.api.planning.domain.model.events.AssignmentClosed;
+import com.formai.api.planning.domain.model.events.RoutineAssigned;
+import com.formai.api.planning.domain.model.events.RoutineUpdated;
+import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
+import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.UUID;
+
+import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
+import static com.formai.api.tracking.TrackingTestData.ROUTINE_ID;
+import static com.formai.api.tracking.TrackingTestData.START_DATE;
+import static com.formai.api.tracking.TrackingTestData.TODAY;
+import static com.formai.api.tracking.TrackingTestData.activeRoutine;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+// The three planning events tracking listens to: each one only translates the event into
+// a tracking command.
+@ExtendWith(MockitoExtension.class)
+class PlanningEventHandlersTest {
+
+    @Mock
+    ActiveRoutineCommandService activeRoutineCommandService;
+
+    @Mock
+    ActiveRoutineRepository activeRoutineRepository;
+
+    @Test
+    void shouldSyncTheClientsRoutineWhenARoutineIsAssigned() {
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService);
+
+        handler.on(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), START_DATE));
+
+        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(CLIENT_ID));
+    }
+
+    @Test
+    void shouldSyncEveryClientFollowingARoutineWhenItIsUpdated() {
+        var otherClient = new ClientId(UUID.randomUUID());
+        var otherRoutine = activeRoutine();
+        otherRoutine.setClientId(otherClient);
+        when(activeRoutineRepository.findAllByRoutineId(ROUTINE_ID)).thenReturn(List.of(activeRoutine(), otherRoutine));
+        var handler = new RoutineUpdatedEventHandler(activeRoutineRepository, activeRoutineCommandService);
+
+        handler.on(new RoutineUpdated(ROUTINE_ID.value(), 2));
+
+        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(CLIENT_ID));
+        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(otherClient));
+    }
+
+    @Test
+    void shouldEndTheClientsRoutineWhenTheAssignmentIsClosed() {
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService);
+
+        handler.on(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY));
+
+        verify(activeRoutineCommandService).handle(new EndActiveRoutineCommand(CLIENT_ID, TODAY));
+    }
+}
