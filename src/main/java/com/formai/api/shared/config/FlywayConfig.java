@@ -20,4 +20,26 @@ public class FlywayConfig {
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
     }
+
+    @Bean
+    public FlywayMigrationInitializer planningFlywayMigrationInitializer(DataSource dataSource) {
+        var flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("planning")
+                .table("flyway_planning")
+                .locations("classpath:db/migration/planning")
+                .load();
+        return new FlywayMigrationInitializer(flyway, null);
+    }
+
+    @Bean
+    public FlywayMigrationInitializer trackingFlywayMigrationInitializer(DataSource dataSource) {
+        var flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("tracking")
+                .table("flyway_tracking")
+                .locations("classpath:db/migration/tracking")
+                .load();
+        return new FlywayMigrationInitializer(flyway, null);
+    }
 }
