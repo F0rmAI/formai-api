@@ -1,15 +1,19 @@
 package com.formai.api.planning.application.internal.commandservices;
 
+import com.formai.api.planning.application.internal.outboundservices.acl.ExternalCatalogService;
 import com.formai.api.planning.domain.exceptions.ExerciseAlreadyExistsException;
 import com.formai.api.planning.domain.exceptions.ExerciseInUseException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.MachineNotPublishedException;
 import com.formai.api.planning.domain.model.aggregates.Exercise;
 import com.formai.api.planning.domain.model.commands.ArchiveExerciseCommand;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
 import com.formai.api.planning.domain.model.commands.DeleteExerciseCommand;
+import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.commands.RestoreExerciseCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
+import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 import com.formai.api.planning.domain.repositories.ExerciseRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
@@ -20,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
@@ -42,6 +47,9 @@ class ExerciseCommandServiceImplTest {
 
     @Mock
     RoutineRepository routineRepository;
+
+    @Mock
+    ExternalCatalogService externalCatalogService;
 
     @InjectMocks
     ExerciseCommandServiceImpl commandService;
@@ -113,5 +121,46 @@ class ExerciseCommandServiceImplTest {
         assertThatThrownBy(() -> commandService.handle(new DeleteExerciseCommand(SQUAT_ID, TRAINER_HOLDER_ID)))
                 .isInstanceOf(ExerciseInUseException.class);
         verify(exerciseRepository, never()).delete(any());
+    }
+
+    @Test
+    void shouldRejectLinkingAMachineThatIsNotPublished() {
+        // Arrange
+        var machineId = new MachineId(UUID.randomUUID());
+        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
+        when(externalCatalogService.isMachinePublished(machineId)).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> commandService.handle(
+                new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID, machineId)))
+                .isInstanceOf(MachineNotPublishedException.class);
+        verify(exerciseRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldLinkAPublishedMachineToTheExercise() {
+        // Arrange
+        var machineId = new MachineId(UUID.randomUUID());
+        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
+        when(externalCatalogService.isMachinePublished(machineId)).thenReturn(true);
+        savesReturnTheExercise();
+
+        // Act
+        var exercise = commandService.handle(
+                new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID, machineId)).orElseThrow();
+
+        // Assert
+        assertThat(exercise.getMachineId()).isEqualTo(machineId);
+    }
+
+    @Test
+    void shouldAnswerNotFoundWhenLinkingAnotherTrainersExercise() {
+        var machineId = new MachineId(UUID.randomUUID());
+        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commandService.handle(
+                new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID, machineId)))
+                .isInstanceOf(ExerciseNotFoundException.class);
+        verify(externalCatalogService, never()).isMachinePublished(any());
     }
 }

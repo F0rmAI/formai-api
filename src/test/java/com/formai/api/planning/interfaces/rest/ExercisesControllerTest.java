@@ -2,14 +2,18 @@ package com.formai.api.planning.interfaces.rest;
 
 import com.formai.api.planning.domain.exceptions.ExerciseAlreadyExistsException;
 import com.formai.api.planning.domain.exceptions.ExerciseInUseException;
+import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.MachineNotPublishedException;
 import com.formai.api.planning.domain.model.commands.ArchiveExerciseCommand;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
 import com.formai.api.planning.domain.model.commands.DeleteExerciseCommand;
+import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.commands.RestoreExerciseCommand;
 import com.formai.api.planning.domain.model.queries.GetExerciseByIdQuery;
 import com.formai.api.planning.domain.model.queries.GetExercisesQuery;
 import com.formai.api.planning.domain.model.valueobjects.ExercisePage;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
+import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.services.ExerciseCommandService;
 import com.formai.api.planning.domain.services.ExerciseQueryService;
 import com.formai.api.planning.interfaces.rest.transform.ExerciseAssemblerImpl;
@@ -27,6 +31,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
@@ -41,6 +46,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -163,5 +169,57 @@ class ExercisesControllerTest {
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(exerciseQueryService);
+    }
+
+    @Test
+    void shouldReturn200WhenTheExerciseIsLinkedToAPublishedMachine() throws Exception {
+        var machineId = UUID.randomUUID();
+        var linked = squat();
+        linked.linkToMachine(new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID,
+                new MachineId(machineId)));
+        when(exerciseCommandService.handle(any(LinkExerciseToMachineCommand.class))).thenReturn(Optional.of(linked));
+
+        mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"machineId\":\"" + machineId + "\"}").with(TRAINER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.machineId").value(machineId.toString()));
+    }
+
+    @Test
+    void shouldReturn422WhenTheMachineIsNotPublished() throws Exception {
+        when(exerciseCommandService.handle(any(LinkExerciseToMachineCommand.class)))
+                .thenThrow(new MachineNotPublishedException());
+
+        mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"machineId\":\"" + UUID.randomUUID() + "\"}").with(TRAINER))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.status").value(422));
+    }
+
+    @Test
+    void shouldReturn400WhenTheMachineIdIsMissing() throws Exception {
+        mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}").with(TRAINER))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(exerciseCommandService);
+    }
+
+    @Test
+    void shouldReturn404WhenLinkingAnotherTrainersExercise() throws Exception {
+        when(exerciseCommandService.handle(any(LinkExerciseToMachineCommand.class)))
+                .thenThrow(new ExerciseNotFoundException());
+
+        mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"machineId\":\"" + UUID.randomUUID() + "\"}").with(TRAINER))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturn403WhenAClientLinksAMachine() throws Exception {
+        mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"machineId\":\"" + UUID.randomUUID() + "\"}")
+                        .with(user(TRAINER_HOLDER_ID).roles("CLIENT")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(exerciseCommandService);
     }
 }
