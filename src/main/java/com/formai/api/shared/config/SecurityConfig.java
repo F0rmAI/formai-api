@@ -38,8 +38,8 @@ public class SecurityConfig {
                         // app is for trainers, the mobile app for clients. Any other role gets 403.
                         .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/routines/**",
                                 "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
-                        .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**")
-                                .hasAuthority("ROLE_CLIENT")
+                        .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**",
+                                "/api/v1/progress-charts/**").hasAuthority("ROLE_CLIENT")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
