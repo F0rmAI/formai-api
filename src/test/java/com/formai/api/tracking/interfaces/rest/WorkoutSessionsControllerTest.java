@@ -72,7 +72,7 @@ class WorkoutSessionsControllerTest {
     // --- History ------------------------------------------------------------------------
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnTheClientsHistoryWithVolumeAndSets() throws Exception {
         var session = pendingSession(TODAY);
         session.recordSet(new RecordSetCommand(session.getId(), CLIENT_ID, SQUAT.exerciseId(), 1,
@@ -93,7 +93,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldFilterTheHistoryByDateRange() throws Exception {
         when(workoutSessionQueryService.handle(argThat((GetWorkoutHistoryQuery query) ->
                 query.period().isPresent() && query.period().get().from().equals(TODAY.minusDays(7)))))
@@ -107,7 +107,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenOnlyOneDateIsGiven() throws Exception {
         mockMvc.perform(get("/api/v1/workout-sessions").param("from", TODAY.toString()))
                 .andExpect(status().isBadRequest());
@@ -116,14 +116,14 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenThePageSizeIsTooLarge() throws Exception {
         mockMvc.perform(get("/api/v1/workout-sessions").param("size", "500"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID)
+    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
     void shouldLetATrainerReadTheirClientsHistory() throws Exception {
         when(workoutSessionQueryService.handle(argThat((GetWorkoutHistoryQuery query) ->
                 query.clientId().equals(CLIENT_ID) && query.requesterHolderId().equals(TRAINER_HOLDER_ID))))
@@ -135,7 +135,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID)
+    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
     void shouldReturn403ForAClientOfAnotherTrainer() throws Exception {
         when(workoutSessionQueryService.handle(any(GetWorkoutHistoryQuery.class)))
                 .thenThrow(new ClientAccessDeniedException());
@@ -150,10 +150,18 @@ class WorkoutSessionsControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    // Logging workouts belongs to the client's mobile app: a trainer's token is not enough (FR-002).
+    @Test
+    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
+    void shouldReturn403ForATrainerOnTheClientsOwnHistory() throws Exception {
+        mockMvc.perform(get("/api/v1/workout-sessions"))
+                .andExpect(status().isForbidden());
+    }
+
     // --- One session --------------------------------------------------------------------
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnOneOfTheClientsSessions() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionQueryService.handle(any(GetWorkoutSessionByIdQuery.class))).thenReturn(Optional.of(session));
@@ -165,7 +173,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn404ForAnUnknownSession() throws Exception {
         when(workoutSessionQueryService.handle(any(GetWorkoutSessionByIdQuery.class))).thenReturn(Optional.empty());
 
@@ -176,7 +184,7 @@ class WorkoutSessionsControllerTest {
     // --- Recording sets -----------------------------------------------------------------
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WithTheUpdatedSessionWhenASetIsRecorded() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionCommandService.handle(argThat((RecordSetCommand command) ->
@@ -190,7 +198,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn422ForNegativeLoad() throws Exception {
         var body = "{\"exerciseId\":\"" + SQUAT.exerciseId().value() + "\",\"setNumber\":1,\"loadKg\":-5,\"reps\":10}";
 
@@ -201,7 +209,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn422ForASetOutsideThePrescription() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new InvalidSetValueException("Set number must be between 1 and 3 for Squat"));
@@ -211,7 +219,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenRepsAreMissing() throws Exception {
         var body = "{\"exerciseId\":\"" + SQUAT.exerciseId().value() + "\",\"setNumber\":1,\"loadKg\":60}";
 
@@ -220,7 +228,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn404WhenRecordingOnAnotherClientsSession() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new WorkoutSessionNotFoundException());
@@ -230,7 +238,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn409WhenRecordingOnAFinishedSession() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new WorkoutSessionAlreadyFinishedException());
@@ -240,7 +248,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WhenASetIsCorrected() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionCommandService.handle(any(CorrectSetCommand.class))).thenReturn(Optional.of(session));
@@ -253,7 +261,7 @@ class WorkoutSessionsControllerTest {
     // --- Finishing ----------------------------------------------------------------------
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WithTheComplianceStatusWhenFinished() throws Exception {
         var session = pendingSession(TODAY);
         session.recordSet(new RecordSetCommand(session.getId(), CLIENT_ID, SQUAT.exerciseId(), 1,
@@ -270,7 +278,7 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn409WhenAPartialFinishIsNotConfirmed() throws Exception {
         when(workoutSessionCommandService.handle(any(FinishWorkoutSessionCommand.class)))
                 .thenThrow(new PartialFinishNotConfirmedException());
