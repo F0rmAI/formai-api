@@ -1,0 +1,15 @@
+package com.formai.api.tracking.domain.services;
+
+import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
+import com.formai.api.tracking.domain.model.queries.GetWorkoutHistoryQuery;
+import com.formai.api.tracking.domain.model.queries.GetWorkoutSessionByIdQuery;
+import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionPage;
+
+import java.util.Optional;
+
+public interface WorkoutSessionQueryService {
+
+    Optional<WorkoutSession> handle(GetWorkoutSessionByIdQuery query);
+
+    WorkoutSessionPage handle(GetWorkoutHistoryQuery query);
+}
