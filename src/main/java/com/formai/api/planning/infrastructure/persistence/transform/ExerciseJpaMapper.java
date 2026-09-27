@@ -3,6 +3,7 @@ package com.formai.api.planning.infrastructure.persistence.transform;
 import com.formai.api.planning.domain.model.aggregates.Exercise;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
+import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 import com.formai.api.planning.infrastructure.persistence.entities.ExerciseJpaEntity;
 import org.mapstruct.Mapper;
@@ -31,6 +32,14 @@ public interface ExerciseJpaMapper {
 
     default ExerciseName mapExerciseName(String value) {
         return value == null ? null : new ExerciseName(value);
+    }
+
+    default UUID map(MachineId machineId) {
+        return machineId == null ? null : machineId.value();
+    }
+
+    default MachineId mapMachineId(UUID value) {
+        return value == null ? null : new MachineId(value);
     }
 
     default String map(MuscleGroup muscleGroup) {

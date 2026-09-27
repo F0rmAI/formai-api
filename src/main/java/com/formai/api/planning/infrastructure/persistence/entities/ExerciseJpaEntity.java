@@ -28,6 +28,9 @@ public class ExerciseJpaEntity {
     @Column(name = "equipment", length = 120)
     private String equipment;
 
+    @Column(name = "machine_id")
+    private UUID machineId;
+
     // Stored as a plain string, not the domain ExerciseStatus type: this entity stays
     // framework-only and has zero dependency on the domain package.
     @Column(name = "status", nullable = false, length = 20)
@@ -75,6 +78,14 @@ public class ExerciseJpaEntity {
 
     public void setEquipment(String equipment) {
         this.equipment = equipment;
+    }
+
+    public UUID getMachineId() {
+        return machineId;
+    }
+
+    public void setMachineId(UUID machineId) {
+        this.machineId = machineId;
     }
 
     public String getStatus() {

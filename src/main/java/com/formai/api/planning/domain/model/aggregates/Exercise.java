@@ -1,9 +1,11 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
+import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
+import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 
 import java.util.UUID;
@@ -15,6 +17,7 @@ public class Exercise {
     private ExerciseName name;
     private MuscleGroup muscleGroup;
     private String equipment;
+    private MachineId machineId;
     private ExerciseStatus status;
 
     // public: required by MapStruct, which generates its mapper impl in a different package.
@@ -38,6 +41,11 @@ public class Exercise {
 
     public void restore() {
         this.status = ExerciseStatus.ACTIVE;
+    }
+
+    // Whether the machine is published is checked by the application service against the catalog.
+    public void linkToMachine(LinkExerciseToMachineCommand command) {
+        this.machineId = command.machineId();
     }
 
     public boolean isActive() {
@@ -64,6 +72,10 @@ public class Exercise {
         return equipment;
     }
 
+    public MachineId getMachineId() {
+        return machineId;
+    }
+
     public ExerciseStatus getStatus() {
         return status;
     }
@@ -86,6 +98,10 @@ public class Exercise {
 
     public void setEquipment(String equipment) {
         this.equipment = equipment;
+    }
+
+    public void setMachineId(MachineId machineId) {
+        this.machineId = machineId;
     }
 
     public void setStatus(ExerciseStatus status) {
