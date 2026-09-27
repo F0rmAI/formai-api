@@ -4,6 +4,7 @@ import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.model.aggregates.Routine;
+import com.formai.api.planning.domain.model.commands.CloseRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CreateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.DuplicateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.MarkRoutineActiveCommand;
@@ -11,6 +12,7 @@ import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
 import com.formai.api.planning.domain.model.entities.PrescribedExercise;
 import com.formai.api.planning.domain.model.entities.RoutineSession;
 import com.formai.api.planning.domain.model.events.RoutineUpdated;
+import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.domain.repositories.ExerciseRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
 import com.formai.api.planning.domain.services.RoutineCommandService;
@@ -26,13 +28,16 @@ public class RoutineCommandServiceImpl implements RoutineCommandService {
 
     private final RoutineRepository routineRepository;
     private final ExerciseRepository exerciseRepository;
+    private final ClientPlanRepository clientPlanRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public RoutineCommandServiceImpl(RoutineRepository routineRepository,
                                      ExerciseRepository exerciseRepository,
+                                     ClientPlanRepository clientPlanRepository,
                                      ApplicationEventPublisher eventPublisher) {
         this.routineRepository = routineRepository;
         this.exerciseRepository = exerciseRepository;
+        this.clientPlanRepository = clientPlanRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -44,8 +49,6 @@ public class RoutineCommandServiceImpl implements RoutineCommandService {
         return Optional.of(routineRepository.save(routine));
     }
 
-    // Each saved change is a new version; tracking re-syncs every client following the
-    // routine when RoutineUpdated is committed.
     @Override
     @Transactional
     public Optional<Routine> handle(UpdateRoutineCommand command) {
@@ -68,7 +71,6 @@ public class RoutineCommandServiceImpl implements RoutineCommandService {
         return Optional.of(routineRepository.save(source.duplicate(command)));
     }
 
-    // Idempotent: marking an already active routine changes nothing.
     @Override
     @Transactional
     public void handle(MarkRoutineActiveCommand command) {
@@ -78,8 +80,18 @@ public class RoutineCommandServiceImpl implements RoutineCommandService {
         });
     }
 
-    // Every prescribed exercise must be an active exercise of the trainer's own catalog;
-    // its current name is copied into the routine.
+    @Override
+    @Transactional
+    public void handle(CloseRoutineCommand command) {
+        if (clientPlanRepository.existsOpenAssignmentByRoutineId(command.routineId())) {
+            return;
+        }
+        routineRepository.findById(command.routineId()).ifPresent(routine -> {
+            routine.close();
+            routineRepository.save(routine);
+        });
+    }
+
     private List<RoutineSession> fromCatalog(String holderId, List<RoutineSession> sessions) {
         return sessions.stream()
                 .map(session -> new RoutineSession(session.getOrder(), session.getLabel(), session.getExercises()

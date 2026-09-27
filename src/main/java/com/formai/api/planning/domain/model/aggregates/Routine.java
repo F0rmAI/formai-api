@@ -17,8 +17,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-// A routine and its full version history. It is created as a DRAFT and every saved change
-// appends a version with its date and author, so earlier versions are never lost (FR-011).
 public class Routine {
 
     private RoutineId id;
@@ -46,14 +44,18 @@ public class Routine {
         return version;
     }
 
-    // An editable DRAFT copy of the current version, with a history of its own and no
-    // clients assigned (FR-008).
     public Routine duplicate(DuplicateRoutineCommand command) {
         return draft(command.holderId(), command.name(), currentVersion().getSessions());
     }
 
     public void markActive() {
         this.status = RoutineStatus.ACTIVE;
+    }
+
+    public void close() {
+        if (status == RoutineStatus.ACTIVE) {
+            this.status = RoutineStatus.CLOSED;
+        }
     }
 
     public RoutineVersion currentVersion() {
@@ -79,7 +81,6 @@ public class Routine {
         return routine;
     }
 
-    // At least one session, and at least one exercise in every session (FR-008).
     private static void ensureValid(List<RoutineSession> sessions) {
         if (sessions == null || sessions.isEmpty()) {
             throw new InvalidRoutineException("A routine needs at least one session");

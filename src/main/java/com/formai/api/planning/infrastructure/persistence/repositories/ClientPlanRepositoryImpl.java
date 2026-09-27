@@ -2,6 +2,7 @@ package com.formai.api.planning.infrastructure.persistence.repositories;
 
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
+import com.formai.api.planning.domain.model.valueobjects.RoutineId;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.infrastructure.persistence.transform.ClientPlanJpaMapper;
 import org.springframework.stereotype.Repository;
@@ -34,5 +35,10 @@ public class ClientPlanRepositoryImpl implements ClientPlanRepository {
     @Override
     public Optional<ClientPlan> findByClientId(ClientId clientId) {
         return jpaRepository.findByClientId(clientId.value()).map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean existsOpenAssignmentByRoutineId(RoutineId routineId) {
+        return jpaRepository.existsOpenAssignmentByRoutineId(routineId.value());
     }
 }

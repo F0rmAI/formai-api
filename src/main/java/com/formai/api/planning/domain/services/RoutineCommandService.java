@@ -1,6 +1,7 @@
 package com.formai.api.planning.domain.services;
 
 import com.formai.api.planning.domain.model.aggregates.Routine;
+import com.formai.api.planning.domain.model.commands.CloseRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CreateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.DuplicateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.MarkRoutineActiveCommand;
@@ -17,4 +18,6 @@ public interface RoutineCommandService {
     Optional<Routine> handle(DuplicateRoutineCommand command);
 
     void handle(MarkRoutineActiveCommand command);
+
+    void handle(CloseRoutineCommand command);
 }

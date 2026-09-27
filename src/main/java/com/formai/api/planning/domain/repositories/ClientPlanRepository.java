@@ -2,6 +2,7 @@ package com.formai.api.planning.domain.repositories;
 
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
+import com.formai.api.planning.domain.model.valueobjects.RoutineId;
 
 import java.util.Optional;
 
@@ -12,4 +13,6 @@ public interface ClientPlanRepository {
     Optional<ClientPlan> findByClientIdAndHolderId(ClientId clientId, String holderId);
 
     Optional<ClientPlan> findByClientId(ClientId clientId);
+
+    boolean existsOpenAssignmentByRoutineId(RoutineId routineId);
 }
