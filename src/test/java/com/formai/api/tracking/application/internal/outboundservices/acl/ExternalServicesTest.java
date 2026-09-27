@@ -1,6 +1,10 @@
 package com.formai.api.tracking.application.internal.outboundservices.acl;
 
 import com.formai.api.clients.interfaces.acl.ClientsContextFacade;
+import com.formai.api.tracking.domain.model.valueobjects.TrainerClient;
+import com.formai.api.tracking.domain.model.valueobjects.Pagination;
+import com.formai.api.shared.contracts.clients.ClientSummaryPage;
+import com.formai.api.shared.contracts.clients.ClientListRequest;
 import com.formai.api.planning.interfaces.acl.PlanningContextFacade;
 import com.formai.api.shared.contracts.clients.ClientSummary;
 import com.formai.api.shared.contracts.planning.ActiveRoutineSnapshot;
@@ -80,5 +84,18 @@ class ExternalServicesTest {
 
         assertThat(new ExternalClientsService(clientsContextFacade).isClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID))
                 .isFalse();
+    }
+
+    @Test
+    void shouldTranslateTheTrainersClientPage() {
+        when(clientsContextFacade.fetchClientsOfTrainer(new ClientListRequest(TRAINER_HOLDER_ID, Optional.of("lu"),
+                Optional.empty(), 0, 20))).thenReturn(new ClientSummaryPage(List.of(
+                new ClientSummary(CLIENT_ID.value(), "Luis Ramos", "luis@formai.com", "ACTIVE")), 0, 20, 1, 1));
+
+        var page = new ExternalClientsService(clientsContextFacade).fetchClientsOfTrainer(TRAINER_HOLDER_ID,
+                Optional.of("lu"), Optional.empty(), new Pagination(0, 20));
+
+        assertThat(page.items()).containsExactly(new TrainerClient(CLIENT_ID, "Luis Ramos", "ACTIVE"));
+        assertThat(page.totalElements()).isEqualTo(1);
     }
 }
