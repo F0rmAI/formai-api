@@ -67,7 +67,7 @@ Lombok, Flyway, and the PostgreSQL driver are managed by the `spring-boot-starte
 ## Project Structure
 
 ```
-com.formai
+com.formai.api
 ├── iam/        Core — authentication. User aggregate (Email + HashedPassword VOs),
 │               issues its own JWT and publishes the UserRegistered event.
 └── shared/     Cross-cutting configuration (Flyway per module, JWT security).
