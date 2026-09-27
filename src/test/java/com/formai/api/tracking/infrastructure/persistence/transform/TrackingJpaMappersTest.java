@@ -21,7 +21,6 @@ import static com.formai.api.tracking.TrackingTestData.activeRoutine;
 import static com.formai.api.tracking.TrackingTestData.pendingSession;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Round trips through the persistence mappers: what is saved must come back unchanged.
 class TrackingJpaMappersTest {
 
     private final ActiveRoutineJpaMapper activeRoutineMapper = Mappers.getMapper(ActiveRoutineJpaMapper.class);

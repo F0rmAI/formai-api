@@ -49,8 +49,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-// Everything that crosses clients' boundary: its Open Host Service, its ACL over iam, the
-// iam events it listens to and the read-side catch-up with a lost activation.
 @ExtendWith(MockitoExtension.class)
 class ClientsIntegrationPointsTest {
 
@@ -74,8 +72,6 @@ class ClientsIntegrationPointsTest {
 
     @Mock
     ExternalIamService externalIamService;
-
-    // --- Open Host Service ---------------------------------------------------------------
 
     @Test
     void shouldPublishOneOfTheTrainersClients() {
@@ -116,8 +112,6 @@ class ClientsIntegrationPointsTest {
         verifyNoInteractions(clientQueryService);
     }
 
-    // --- ACL over iam --------------------------------------------------------------------
-
     @Test
     void shouldTurnTheNewIamAccountIntoAnActivationTicket() {
         when(iamContextFacade.createClientAccount("luis@formai.com"))
@@ -142,8 +136,6 @@ class ClientsIntegrationPointsTest {
         assertThat(acl.isAccountActive(CLIENT_ID)).isFalse();
         assertThat(acl.isAccountActive(CLIENT_ID)).isFalse();
     }
-
-    // --- iam events ----------------------------------------------------------------------
 
     @Test
     void shouldRegisterTheTrainerWhenTheirAccountIsRegistered() {
@@ -174,8 +166,6 @@ class ClientsIntegrationPointsTest {
 
         verify(clientCommandService).handle(new ActivateClientCommand(CLIENT_ID));
     }
-
-    // --- Read-side catch-up ----------------------------------------------------------------
 
     @Test
     void shouldShowAnInvitedClientAsActiveOnceItsAccountIsActive() {

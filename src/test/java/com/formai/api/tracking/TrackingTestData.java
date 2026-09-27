@@ -16,11 +16,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// Shared fixtures for the tracking tests: a two-day routine (legs, then chest) assigned
-// to one client.
 public final class TrackingTestData {
 
-    // Holder ids are JWT subjects; a client's subject is also its ClientId.
     public static final String CLIENT_HOLDER_ID = "11111111-1111-1111-1111-111111111111";
     public static final ClientId CLIENT_ID = new ClientId(UUID.fromString(CLIENT_HOLDER_ID));
     public static final String TRAINER_HOLDER_ID = "22222222-2222-2222-2222-222222222222";
@@ -52,7 +49,6 @@ public final class TrackingTestData {
         return ActiveRoutine.syncFrom(new SyncActiveRoutineCommand(CLIENT_ID), plannedRoutine(1));
     }
 
-    // A pending legs-day session: squat (3 sets) and bench press (2 sets).
     public static WorkoutSession pendingSession(LocalDate date) {
         return WorkoutSession.schedule(new ScheduleWorkoutSessionCommand(CLIENT_ID, date), activeRoutine(), LEGS_DAY);
     }

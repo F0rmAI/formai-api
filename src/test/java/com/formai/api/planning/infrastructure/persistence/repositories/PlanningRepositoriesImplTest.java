@@ -34,8 +34,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// The three planning repositories: each one maps to the JPA entity, delegates to Spring Data
-// and maps back, always scoping trainer data by holderId.
 @ExtendWith(MockitoExtension.class)
 class PlanningRepositoriesImplTest {
 

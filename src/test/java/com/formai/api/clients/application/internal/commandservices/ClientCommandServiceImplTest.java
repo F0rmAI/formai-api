@@ -67,8 +67,6 @@ class ClientCommandServiceImplTest {
         when(clientRepository.findByIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(client));
     }
 
-    // --- Register ------------------------------------------------------------------------
-
     @Test
     void shouldRegisterAnInvitedClientWithItsActivationCode() {
         // Arrange
@@ -105,8 +103,6 @@ class ClientCommandServiceImplTest {
         verify(clientRepository, never()).save(any());
     }
 
-    // --- Activation code -----------------------------------------------------------------
-
     @Test
     void shouldIssueANewCodeForAnInvitedClient() {
         trainerOwns(invitedClient());
@@ -135,8 +131,6 @@ class ClientCommandServiceImplTest {
                 .isInstanceOf(ClientNotFoundException.class);
     }
 
-    // --- Activation ----------------------------------------------------------------------
-
     @Test
     void shouldActivateAnInvitedClientAndPublishClientActivated() {
         var client = invitedClient();
@@ -164,8 +158,6 @@ class ClientCommandServiceImplTest {
         verify(eventPublisher).publishEvent(new ClientActivated(CLIENT_ID.value()));
     }
 
-    // --- Deactivation --------------------------------------------------------------------
-
     @Test
     void shouldDeactivateDisableTheAccountAndPublishClientDeactivated() {
         trainerOwns(activeClient());
@@ -189,8 +181,6 @@ class ClientCommandServiceImplTest {
         verify(externalIamService, never()).disableAccount(any());
         verify(eventPublisher, never()).publishEvent(any(ClientDeactivated.class));
     }
-
-    // --- Body profile --------------------------------------------------------------------
 
     @Test
     void shouldSaveTheBodyProfileAndPublishTheNewWeight() {

@@ -23,10 +23,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -52,8 +53,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, RoutineAssemblerImpl.class,
         ClientPlanAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class RoutinesControllerTest {
+
+    private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
 
     private static final String ROUTINE_BODY = "{\"name\":\"Legs only\",\"sessions\":[{\"label\":\"Day A\","
             + "\"exercises\":[{\"exerciseId\":\"" + SQUAT_ID.value() + "\",\"sets\":3,\"reps\":10,"
@@ -83,7 +85,7 @@ class RoutinesControllerTest {
                         && command.sessions().getFirst().getExercises().getFirst().getPrescription().sets() == 3)))
                 .thenReturn(Optional.of(routine));
 
-        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY))
+        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY).with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andExpect(jsonPath("$.currentVersion").value(1))
@@ -93,7 +95,7 @@ class RoutinesControllerTest {
 
     @Test
     void shouldReturn422ForSetsOfZero() throws Exception {
-        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(routineBody(0)))
+        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(routineBody(0)).with(TRAINER))
                 .andExpect(status().isUnprocessableEntity());
 
         verifyNoInteractions(routineCommandService);
@@ -102,7 +104,7 @@ class RoutinesControllerTest {
     @Test
     void shouldReturn400WhenAPrescriptionValueIsMissing() throws Exception {
         mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON)
-                        .content(ROUTINE_BODY.replace("\"reps\":10,", "")))
+                        .content(ROUTINE_BODY.replace("\"reps\":10,", "")).with(TRAINER))
                 .andExpect(status().isBadRequest());
     }
 
@@ -110,7 +112,7 @@ class RoutinesControllerTest {
     void shouldReturn404ForAnExerciseOutsideTheCatalog() throws Exception {
         when(routineCommandService.handle(any(CreateRoutineCommand.class))).thenThrow(new ExerciseNotFoundException());
 
-        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY))
+        mockMvc.perform(post("/api/v1/routines").contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY).with(TRAINER))
                 .andExpect(status().isNotFound());
     }
 
@@ -122,7 +124,7 @@ class RoutinesControllerTest {
         when(routineCommandService.handle(any(UpdateRoutineCommand.class))).thenReturn(Optional.of(routine));
 
         mockMvc.perform(put("/api/v1/routines/" + routine.getId().value())
-                        .contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(ROUTINE_BODY).with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentVersion").value(2));
     }
@@ -134,7 +136,7 @@ class RoutinesControllerTest {
         when(routineQueryService.handle(any(GetRoutineVersionsQuery.class)))
                 .thenReturn(List.of(routine.getVersions().get(1), routine.getVersions().get(0)));
 
-        mockMvc.perform(get("/api/v1/routines/" + routine.getId().value() + "/versions"))
+        mockMvc.perform(get("/api/v1/routines/" + routine.getId().value() + "/versions").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].number").value(2))
                 .andExpect(jsonPath("$[0].author").value("editor"))
@@ -146,7 +148,7 @@ class RoutinesControllerTest {
     void shouldReturn404ForTheVersionsOfAnUnknownRoutine() throws Exception {
         when(routineQueryService.handle(any(GetRoutineVersionsQuery.class))).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/routines/" + UUID.randomUUID() + "/versions"))
+        mockMvc.perform(get("/api/v1/routines/" + UUID.randomUUID() + "/versions").with(TRAINER))
                 .andExpect(status().isNotFound());
     }
 
@@ -156,7 +158,7 @@ class RoutinesControllerTest {
         when(routineCommandService.handle(any(DuplicateRoutineCommand.class))).thenReturn(Optional.of(copy));
 
         mockMvc.perform(post("/api/v1/routines/" + UUID.randomUUID() + "/duplicates")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Copy\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Copy\"}").with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"));
     }
@@ -176,7 +178,7 @@ class RoutinesControllerTest {
                 + CLIENT_ID.value() + "\"],\"startDate\":\"" + START_DATE + "\"}";
 
         mockMvc.perform(post("/api/v1/routines/" + routine.getId().value() + "/assignments")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                        .contentType(MediaType.APPLICATION_JSON).content(body).with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].routineName").value("Strength 12 weeks"))
@@ -192,7 +194,7 @@ class RoutinesControllerTest {
         var body = "{\"clientIds\":[\"" + CLIENT_ID.value() + "\"],\"startDate\":\"" + START_DATE + "\"}";
 
         mockMvc.perform(post("/api/v1/routines/" + UUID.randomUUID() + "/assignments")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                        .contentType(MediaType.APPLICATION_JSON).content(body).with(TRAINER))
                 .andExpect(status().isUnprocessableEntity());
     }
 
@@ -200,7 +202,7 @@ class RoutinesControllerTest {
     void shouldReturn400WhenNoClientIsListed() throws Exception {
         mockMvc.perform(post("/api/v1/routines/" + UUID.randomUUID() + "/assignments")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"clientIds\":[],\"startDate\":\"" + START_DATE + "\"}"))
+                        .content("{\"clientIds\":[],\"startDate\":\"" + START_DATE + "\"}").with(TRAINER))
                 .andExpect(status().isBadRequest());
     }
 
@@ -208,7 +210,7 @@ class RoutinesControllerTest {
     void shouldReturn404ForAnotherTrainersRoutine() throws Exception {
         when(routineQueryService.handle(any(GetRoutineByIdQuery.class))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/routines/" + UUID.randomUUID()))
+        mockMvc.perform(get("/api/v1/routines/" + UUID.randomUUID()).with(TRAINER))
                 .andExpect(status().isNotFound());
     }
 }

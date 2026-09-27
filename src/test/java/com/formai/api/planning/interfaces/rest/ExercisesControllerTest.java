@@ -20,11 +20,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithAnonymousUser;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +37,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,8 +47,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(ExercisesController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, ExerciseAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class ExercisesControllerTest {
+
+    private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
 
     private static final String SQUAT_BODY = "{\"name\":\"Squat\",\"muscleGroup\":\"Legs\",\"equipment\":\"Barbell\"}";
 
@@ -67,7 +68,7 @@ class ExercisesControllerTest {
                 command.holderId().equals(TRAINER_HOLDER_ID) && command.name().value().equals("Squat"))))
                 .thenReturn(Optional.of(squat()));
 
-        mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY))
+        mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY).with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(SQUAT_ID.value().toString()))
                 .andExpect(jsonPath("$.muscleGroup").value("Legs"))
@@ -78,7 +79,7 @@ class ExercisesControllerTest {
     @Test
     void shouldReturn400WhenTheNameIsMissing() throws Exception {
         mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"muscleGroup\":\"Legs\"}"))
+                        .content("{\"muscleGroup\":\"Legs\"}").with(TRAINER))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(exerciseCommandService);
@@ -89,7 +90,7 @@ class ExercisesControllerTest {
         when(exerciseCommandService.handle(any(CreateExerciseCommand.class)))
                 .thenThrow(new ExerciseAlreadyExistsException("Squat"));
 
-        mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY))
+        mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY).with(TRAINER))
                 .andExpect(status().isConflict());
     }
 
@@ -99,7 +100,7 @@ class ExercisesControllerTest {
                 query.search().equals(Optional.of("squ")) && query.status().equals(Optional.of(ExerciseStatus.ACTIVE)))))
                 .thenReturn(new ExercisePage(List.of(squat()), 0, 20, 1, 1));
 
-        mockMvc.perform(get("/api/v1/exercises").param("search", "squ").param("status", "active"))
+        mockMvc.perform(get("/api/v1/exercises").param("search", "squ").param("status", "active").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Squat"))
                 .andExpect(jsonPath("$.totalElements").value(1));
@@ -107,7 +108,7 @@ class ExercisesControllerTest {
 
     @Test
     void shouldReturn400ForAnUnknownStatus() throws Exception {
-        mockMvc.perform(get("/api/v1/exercises").param("status", "DELETED"))
+        mockMvc.perform(get("/api/v1/exercises").param("status", "DELETED").with(TRAINER))
                 .andExpect(status().isBadRequest());
     }
 
@@ -115,13 +116,13 @@ class ExercisesControllerTest {
     void shouldReturn404ForAnExerciseOfAnotherTrainer() throws Exception {
         when(exerciseQueryService.handle(any(GetExerciseByIdQuery.class))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/exercises/" + SQUAT_ID.value()))
+        mockMvc.perform(get("/api/v1/exercises/" + SQUAT_ID.value()).with(TRAINER))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void shouldReturn204WhenAnUnusedExerciseIsDeleted() throws Exception {
-        mockMvc.perform(delete("/api/v1/exercises/" + SQUAT_ID.value()))
+        mockMvc.perform(delete("/api/v1/exercises/" + SQUAT_ID.value()).with(TRAINER))
                 .andExpect(status().isNoContent());
 
         verify(exerciseCommandService).handle(new DeleteExerciseCommand(SQUAT_ID, TRAINER_HOLDER_ID));
@@ -131,7 +132,7 @@ class ExercisesControllerTest {
     void shouldReturn409WhenDeletingAnExerciseInUse() throws Exception {
         doThrow(new ExerciseInUseException()).when(exerciseCommandService).handle(any(DeleteExerciseCommand.class));
 
-        mockMvc.perform(delete("/api/v1/exercises/" + SQUAT_ID.value()))
+        mockMvc.perform(delete("/api/v1/exercises/" + SQUAT_ID.value()).with(TRAINER))
                 .andExpect(status().isConflict());
     }
 
@@ -142,26 +143,23 @@ class ExercisesControllerTest {
         when(exerciseCommandService.handle(any(ArchiveExerciseCommand.class))).thenReturn(Optional.of(archived));
         when(exerciseCommandService.handle(any(RestoreExerciseCommand.class))).thenReturn(Optional.of(squat()));
 
-        mockMvc.perform(post("/api/v1/exercises/" + SQUAT_ID.value() + "/archivals"))
+        mockMvc.perform(post("/api/v1/exercises/" + SQUAT_ID.value() + "/archivals").with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ARCHIVED"));
-        mockMvc.perform(post("/api/v1/exercises/" + SQUAT_ID.value() + "/restorations"))
+        mockMvc.perform(post("/api/v1/exercises/" + SQUAT_ID.value() + "/restorations").with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test
-    @WithAnonymousUser
     void shouldRejectARequestWithoutJwt() throws Exception {
         mockMvc.perform(get("/api/v1/exercises"))
                 .andExpect(status().isForbidden());
     }
 
-    // The catalog belongs to the trainer's web app: a client's token is not enough (FR-002).
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "CLIENT")
     void shouldReturn403ForAClientToken() throws Exception {
-        mockMvc.perform(get("/api/v1/exercises"))
+        mockMvc.perform(get("/api/v1/exercises").with(user(TRAINER_HOLDER_ID).roles("CLIENT")))
                 .andExpect(status().isForbidden());
 
         verifyNoInteractions(exerciseQueryService);

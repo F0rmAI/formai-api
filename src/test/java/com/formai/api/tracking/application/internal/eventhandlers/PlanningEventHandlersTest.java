@@ -24,8 +24,6 @@ import static com.formai.api.tracking.TrackingTestData.activeRoutine;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// The three planning events tracking listens to: each one only translates the event into
-// a tracking command.
 @ExtendWith(MockitoExtension.class)
 class PlanningEventHandlersTest {
 

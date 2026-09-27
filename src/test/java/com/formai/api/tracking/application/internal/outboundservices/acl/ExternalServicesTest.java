@@ -28,7 +28,6 @@ import static com.formai.api.tracking.TrackingTestData.TRAINER_HOLDER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-// The two ACLs tracking uses to reach its upstream contexts.
 @ExtendWith(MockitoExtension.class)
 class ExternalServicesTest {
 

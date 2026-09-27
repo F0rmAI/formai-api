@@ -23,10 +23,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,6 +53,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, WorkoutSessionAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
 class WorkoutSessionsControllerTest {
+
+    private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
+    private static final RequestPostProcessor CLIENT = user(CLIENT_HOLDER_ID).roles("CLIENT");
 
     private static final String SET_BODY =
             "{\"exerciseId\":\"" + SQUAT.exerciseId().value() + "\",\"setNumber\":1,\"loadKg\":60,\"reps\":10}";
@@ -69,10 +73,7 @@ class WorkoutSessionsControllerTest {
         return "/api/v1/workout-sessions/" + sessionId + "/sets";
     }
 
-    // --- History ------------------------------------------------------------------------
-
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnTheClientsHistoryWithVolumeAndSets() throws Exception {
         var session = pendingSession(TODAY);
         session.recordSet(new RecordSetCommand(session.getId(), CLIENT_ID, SQUAT.exerciseId(), 1,
@@ -82,7 +83,7 @@ class WorkoutSessionsControllerTest {
                         && query.period().isEmpty() && query.pagination().size() == 20)))
                 .thenReturn(new WorkoutSessionPage(List.of(session), 0, 20, 1, 1));
 
-        mockMvc.perform(get("/api/v1/workout-sessions"))
+        mockMvc.perform(get("/api/v1/workout-sessions").with(CLIENT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].status").value("PENDING"))
                 .andExpect(jsonPath("$.content[0].totalVolumeKg").value(600))
@@ -93,7 +94,6 @@ class WorkoutSessionsControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldFilterTheHistoryByDateRange() throws Exception {
         when(workoutSessionQueryService.handle(argThat((GetWorkoutHistoryQuery query) ->
                 query.period().isPresent() && query.period().get().from().equals(TODAY.minusDays(7)))))
@@ -101,46 +101,42 @@ class WorkoutSessionsControllerTest {
 
         mockMvc.perform(get("/api/v1/workout-sessions")
                         .param("from", TODAY.minusDays(7).toString())
-                        .param("to", TODAY.toString()))
+                        .param("to", TODAY.toString()).with(CLIENT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0));
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenOnlyOneDateIsGiven() throws Exception {
-        mockMvc.perform(get("/api/v1/workout-sessions").param("from", TODAY.toString()))
+        mockMvc.perform(get("/api/v1/workout-sessions").param("from", TODAY.toString()).with(CLIENT))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(workoutSessionQueryService);
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenThePageSizeIsTooLarge() throws Exception {
-        mockMvc.perform(get("/api/v1/workout-sessions").param("size", "500"))
+        mockMvc.perform(get("/api/v1/workout-sessions").param("size", "500").with(CLIENT))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
     void shouldLetATrainerReadTheirClientsHistory() throws Exception {
         when(workoutSessionQueryService.handle(argThat((GetWorkoutHistoryQuery query) ->
                 query.clientId().equals(CLIENT_ID) && query.requesterHolderId().equals(TRAINER_HOLDER_ID))))
                 .thenReturn(new WorkoutSessionPage(List.of(pendingSession(TODAY)), 0, 20, 1, 1));
 
-        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/workout-sessions"))
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/workout-sessions").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1));
     }
 
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
     void shouldReturn403ForAClientOfAnotherTrainer() throws Exception {
         when(workoutSessionQueryService.handle(any(GetWorkoutHistoryQuery.class)))
                 .thenThrow(new ClientAccessDeniedException());
 
-        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/workout-sessions"))
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/workout-sessions").with(TRAINER))
                 .andExpect(status().isForbidden());
     }
 
@@ -150,41 +146,32 @@ class WorkoutSessionsControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    // Logging workouts belongs to the client's mobile app: a trainer's token is not enough (FR-002).
     @Test
-    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
     void shouldReturn403ForATrainerOnTheClientsOwnHistory() throws Exception {
-        mockMvc.perform(get("/api/v1/workout-sessions"))
+        mockMvc.perform(get("/api/v1/workout-sessions").with(TRAINER))
                 .andExpect(status().isForbidden());
     }
 
-    // --- One session --------------------------------------------------------------------
-
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnOneOfTheClientsSessions() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionQueryService.handle(any(GetWorkoutSessionByIdQuery.class))).thenReturn(Optional.of(session));
 
-        mockMvc.perform(get("/api/v1/workout-sessions/" + session.getId().value()))
+        mockMvc.perform(get("/api/v1/workout-sessions/" + session.getId().value()).with(CLIENT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(session.getId().value().toString()))
                 .andExpect(jsonPath("$.dayLabel").value("Day A · Legs"));
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn404ForAnUnknownSession() throws Exception {
         when(workoutSessionQueryService.handle(any(GetWorkoutSessionByIdQuery.class))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/workout-sessions/" + UUID.randomUUID()))
+        mockMvc.perform(get("/api/v1/workout-sessions/" + UUID.randomUUID()).with(CLIENT))
                 .andExpect(status().isNotFound());
     }
 
-    // --- Recording sets -----------------------------------------------------------------
-
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WithTheUpdatedSessionWhenASetIsRecorded() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionCommandService.handle(argThat((RecordSetCommand command) ->
@@ -192,76 +179,67 @@ class WorkoutSessionsControllerTest {
                 .thenReturn(Optional.of(session));
 
         mockMvc.perform(post(setsPath(session.getId().value()))
-                        .contentType(MediaType.APPLICATION_JSON).content(SET_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(SET_BODY).with(CLIENT))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(session.getId().value().toString()));
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn422ForNegativeLoad() throws Exception {
         var body = "{\"exerciseId\":\"" + SQUAT.exerciseId().value() + "\",\"setNumber\":1,\"loadKg\":-5,\"reps\":10}";
 
-        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(body).with(CLIENT))
                 .andExpect(status().isUnprocessableEntity());
 
         verifyNoInteractions(workoutSessionCommandService);
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn422ForASetOutsideThePrescription() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new InvalidSetValueException("Set number must be between 1 and 3 for Squat"));
 
-        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY))
+        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY).with(CLIENT))
                 .andExpect(status().isUnprocessableEntity());
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn400WhenRepsAreMissing() throws Exception {
         var body = "{\"exerciseId\":\"" + SQUAT.exerciseId().value() + "\",\"setNumber\":1,\"loadKg\":60}";
 
-        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(body).with(CLIENT))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn404WhenRecordingOnAnotherClientsSession() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new WorkoutSessionNotFoundException());
 
-        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY))
+        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY).with(CLIENT))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn409WhenRecordingOnAFinishedSession() throws Exception {
         when(workoutSessionCommandService.handle(any(RecordSetCommand.class)))
                 .thenThrow(new WorkoutSessionAlreadyFinishedException());
 
-        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY))
+        mockMvc.perform(post(setsPath(UUID.randomUUID())).contentType(MediaType.APPLICATION_JSON).content(SET_BODY).with(CLIENT))
                 .andExpect(status().isConflict());
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WhenASetIsCorrected() throws Exception {
         var session = pendingSession(TODAY);
         when(workoutSessionCommandService.handle(any(CorrectSetCommand.class))).thenReturn(Optional.of(session));
 
         mockMvc.perform(post("/api/v1/workout-sessions/" + session.getId().value() + "/corrections")
-                        .contentType(MediaType.APPLICATION_JSON).content(SET_BODY))
+                        .contentType(MediaType.APPLICATION_JSON).content(SET_BODY).with(CLIENT))
                 .andExpect(status().isCreated());
     }
 
-    // --- Finishing ----------------------------------------------------------------------
-
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn201WithTheComplianceStatusWhenFinished() throws Exception {
         var session = pendingSession(TODAY);
         session.recordSet(new RecordSetCommand(session.getId(), CLIENT_ID, SQUAT.exerciseId(), 1,
@@ -271,20 +249,19 @@ class WorkoutSessionsControllerTest {
                 command.confirmPartial()))).thenReturn(Optional.of(session));
 
         mockMvc.perform(post("/api/v1/workout-sessions/" + session.getId().value() + "/completions")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmPartial\":true}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmPartial\":true}").with(CLIENT))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PARTIAL"))
                 .andExpect(jsonPath("$.finishedAt").exists());
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn409WhenAPartialFinishIsNotConfirmed() throws Exception {
         when(workoutSessionCommandService.handle(any(FinishWorkoutSessionCommand.class)))
                 .thenThrow(new PartialFinishNotConfirmedException());
 
         mockMvc.perform(post("/api/v1/workout-sessions/" + UUID.randomUUID() + "/completions")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmPartial\":false}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmPartial\":false}").with(CLIENT))
                 .andExpect(status().isConflict());
     }
 }

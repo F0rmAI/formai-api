@@ -16,7 +16,6 @@ import static com.formai.api.clients.ClientsTestData.bodyProfileCommand;
 import static com.formai.api.clients.ClientsTestData.invitedClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Round trips through the persistence mappers: what is saved must come back unchanged.
 class ClientsJpaMappersTest {
 
     private final ClientJpaMapper clientMapper = Mappers.getMapper(ClientJpaMapper.class);

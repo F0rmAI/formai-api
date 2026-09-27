@@ -23,8 +23,6 @@ import static com.formai.api.planning.PlanningTestData.twoSessions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-// The planning queries with behaviour of their own: version history and the active
-// assignment tracking reads through the facade.
 @ExtendWith(MockitoExtension.class)
 class PlanningQueryServicesTest {
 

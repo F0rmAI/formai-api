@@ -105,9 +105,6 @@ class WorkoutSessionDailyJobTest {
         var routine = activeRoutine();
         when(activeRoutineQueryService.handle(new GetActiveRoutinesOnQuery(TODAY)))
                 .thenReturn(List.of(failingRoutine, routine));
-        // handle(...) is stubbed several times and is overloaded, and strict stubbing matches
-        // stubs by method name: doReturn avoids re-invoking the mock while stubbing, and
-        // lenient() lets the job call the SkipOverdue overload the throwing stub doesn't match.
         doReturn(Optional.of(failingRoutine))
                 .when(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(failing));
         doReturn(Optional.of(routine))

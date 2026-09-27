@@ -16,10 +16,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-// Shared fixtures for the clients tests: one trainer and one invited client.
 public final class ClientsTestData {
 
-    // Holder ids are JWT subjects; a client's id is the id of their iam account.
     public static final String TRAINER_HOLDER_ID = "22222222-2222-2222-2222-222222222222";
     public static final ClientId CLIENT_ID = new ClientId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
     public static final Email CLIENT_EMAIL = new Email("luis@formai.com");

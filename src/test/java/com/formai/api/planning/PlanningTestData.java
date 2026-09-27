@@ -20,10 +20,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// Shared fixtures for the planning tests: one trainer, one client and a two-session routine.
 public final class PlanningTestData {
 
-    // Holder ids are JWT subjects.
     public static final String TRAINER_HOLDER_ID = "22222222-2222-2222-2222-222222222222";
     public static final ClientId CLIENT_ID = new ClientId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
     public static final ExerciseId SQUAT_ID = new ExerciseId(UUID.fromString("44444444-4444-4444-4444-444444444444"));

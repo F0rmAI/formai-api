@@ -28,8 +28,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// The client repository maps to the JPA entity, delegates to Spring Data and maps back,
-// always scoping the trainer's clients by holderId.
 @ExtendWith(MockitoExtension.class)
 class ClientRepositoryImplTest {
 

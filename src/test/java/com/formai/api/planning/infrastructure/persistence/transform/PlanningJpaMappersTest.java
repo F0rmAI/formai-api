@@ -20,7 +20,6 @@ import static com.formai.api.planning.PlanningTestData.squat;
 import static com.formai.api.planning.PlanningTestData.twoSessions;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Round trips through the persistence mappers: what is saved must come back unchanged.
 class PlanningJpaMappersTest {
 
     private final ExerciseJpaMapper exerciseMapper = Mappers.getMapper(ExerciseJpaMapper.class);

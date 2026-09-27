@@ -13,10 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +29,7 @@ import static com.formai.api.planning.PlanningTestData.routine;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,8 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AssignmentsController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, ClientPlanAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class AssignmentsControllerTest {
+
+    private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
 
     @Autowired
     MockMvc mockMvc;
@@ -61,7 +63,7 @@ class AssignmentsControllerTest {
         when(routineQueryService.handle(new GetRoutineByIdQuery(current.getId(), TRAINER_HOLDER_ID)))
                 .thenReturn(Optional.of(current));
 
-        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments"))
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].routineName").value("Strength 12 weeks"))
@@ -74,7 +76,7 @@ class AssignmentsControllerTest {
     void shouldReturnAnEmptyListForAClientThatIsNotTheTrainers() throws Exception {
         when(clientPlanQueryService.handle(any(GetClientPlanQuery.class))).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments"))
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
