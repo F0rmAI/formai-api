@@ -14,8 +14,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 
-// A person a trainer registered. Its id is the id of the iam account created for it,
-// so it is also the sub of the client's JWT in the app.
 public class Client {
 
     private ClientId id;
@@ -45,7 +43,6 @@ public class Client {
         this.fullName = command.fullName();
     }
 
-    // A new code only makes sense while the client has not activated their account.
     public boolean canRenewActivationCode() {
         return status == ClientStatus.INVITED;
     }
@@ -56,7 +53,6 @@ public class Client {
         }
     }
 
-    // Deactivating deletes nothing: the client's history stays available (FR-006).
     public void deactivate() {
         this.status = ClientStatus.INACTIVE;
     }

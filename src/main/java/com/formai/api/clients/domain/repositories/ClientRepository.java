@@ -19,7 +19,6 @@ public interface ClientRepository {
 
     boolean existsByHolderIdAndEmail(String holderId, Email email);
 
-    // Sorted by full name.
     ClientPage findAllByHolderId(String holderId, Optional<String> search, Optional<ClientStatus> status,
                                  Pagination pagination);
 }

@@ -5,7 +5,6 @@ import jakarta.persistence.Embeddable;
 
 import java.math.BigDecimal;
 
-// All columns null means the client has no body profile yet.
 @Embeddable
 public class BodyProfileEmbeddable {
 

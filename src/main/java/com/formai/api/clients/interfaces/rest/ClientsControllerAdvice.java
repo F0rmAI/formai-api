@@ -36,7 +36,6 @@ public class ClientsControllerAdvice {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
-    // The field name lets the web app highlight the invalid input (FR-007).
     @ExceptionHandler(InvalidBodyProfileException.class)
     public ProblemDetail handleInvalidBodyProfile(InvalidBodyProfileException ex) {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());

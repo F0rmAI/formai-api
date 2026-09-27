@@ -8,7 +8,6 @@ import com.formai.api.clients.domain.model.valueobjects.TrainerId;
 import java.time.Instant;
 import java.util.UUID;
 
-// The trainer's profile in clients, created once their iam account is registered.
 public class Trainer {
 
     private TrainerId id;

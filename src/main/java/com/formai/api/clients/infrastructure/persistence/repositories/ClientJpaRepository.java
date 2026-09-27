@@ -25,7 +25,6 @@ public interface ClientJpaRepository extends JpaRepository<ClientJpaEntity, UUID
     Page<ClientJpaEntity> search(@Param("holderId") String holderId, @Param("search") String search,
                                  @Param("statuses") Collection<String> statuses, Pageable pagination);
 
-    // No search matches every name, and no status matches all of them.
     default Page<ClientJpaEntity> findAllByHolderId(String holderId, Optional<String> search,
                                                    Optional<String> status, Pageable pagination) {
         return search(holderId, search.orElse(""), status.map(List::of).orElse(ALL_STATUSES), pagination);

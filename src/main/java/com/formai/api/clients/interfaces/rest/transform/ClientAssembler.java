@@ -29,9 +29,11 @@ import com.formai.api.clients.interfaces.rest.resources.UpdateBodyProfileResourc
 import com.formai.api.clients.interfaces.rest.resources.UpdateClientResource;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,42 +46,41 @@ public interface ClientAssembler {
     @Mapping(target = "content", source = "items")
     ClientPageResource toResource(ClientPage page);
 
-    default RegisteredClientResource toResource(RegisteredClient registered) {
-        var client = registered.client();
-        var ticket = registered.ticket();
-        return new RegisteredClientResource(client.getId().value(), client.getFullName().value(),
-                client.getEmail().value(), client.getStatus().name(), ticket.code(), ticket.expiresAt());
-    }
+    @Mapping(target = "id", source = "client.id")
+    @Mapping(target = "fullName", source = "client.fullName")
+    @Mapping(target = "email", source = "client.email")
+    @Mapping(target = "status", source = "client.status")
+    @Mapping(target = "activationCode", source = "ticket.code")
+    @Mapping(target = "activationCodeExpiresAt", source = "ticket.expiresAt")
+    RegisteredClientResource toResource(RegisteredClient registered);
 
-    default ActivationCodeResource toResource(ActivationTicket ticket) {
-        return new ActivationCodeResource(ticket.clientId().value(), ticket.code(), ticket.expiresAt());
-    }
+    @Mapping(target = "activationCode", source = "code")
+    ActivationCodeResource toResource(ActivationTicket ticket);
 
-    default BodyProfileResource toResource(BodyProfile profile) {
-        return new BodyProfileResource(profile.getGoal().value(), profile.getHeight().centimeters(),
-                profile.getCurrentWeight().kilograms(), profile.getRestrictions(),
-                profile.getWeightHistory().stream().map(this::toResource).toList());
-    }
+    @Mapping(target = "heightCm", source = "height.centimeters")
+    @Mapping(target = "weightKg", source = "currentWeight.kilograms")
+    BodyProfileResource toResource(BodyProfile profile);
 
-    default BodyWeightRecordResource toResource(BodyWeightRecord record) {
-        return new BodyWeightRecordResource(record.weight().kilograms(), record.recordedOn());
-    }
+    @Mapping(target = "weightKg", source = "weight.kilograms")
+    BodyWeightRecordResource toResource(BodyWeightRecord record);
 
-    default RegisterClientCommand toCommand(String holderId, RegisterClientResource resource) {
-        return new RegisterClientCommand(holderId, new FullName(resource.fullName()), new Email(resource.email()));
-    }
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "fullName", source = "resource.fullName")
+    @Mapping(target = "email", source = "resource.email")
+    RegisterClientCommand toCommand(String holderId, RegisterClientResource resource);
 
-    default UpdateClientCommand toCommand(UUID clientId, String holderId, UpdateClientResource resource) {
-        return new UpdateClientCommand(new ClientId(clientId), holderId, new FullName(resource.fullName()));
-    }
+    @Mapping(target = "clientId", source = "clientId")
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "fullName", source = "resource.fullName")
+    UpdateClientCommand toCommand(UUID clientId, String holderId, UpdateClientResource resource);
 
-    // Height and BodyWeight check their own ranges and answer 422 naming the field.
-    default UpdateBodyProfileCommand toCommand(UUID clientId, String holderId, UpdateBodyProfileResource resource) {
-        var restrictions = Optional.ofNullable(resource.restrictions()).filter(value -> !value.isBlank())
-                .map(String::strip).orElse(null);
-        return new UpdateBodyProfileCommand(new ClientId(clientId), holderId, new TrainingGoal(resource.goal()),
-                new Height(resource.heightCm()), new BodyWeight(resource.weightKg()), restrictions);
-    }
+    @Mapping(target = "clientId", source = "clientId")
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "goal", source = "resource.goal")
+    @Mapping(target = "height", source = "resource.heightCm")
+    @Mapping(target = "weight", source = "resource.weightKg")
+    @Mapping(target = "restrictions", source = "resource.restrictions", qualifiedByName = "optionalText")
+    UpdateBodyProfileCommand toCommand(UUID clientId, String holderId, UpdateBodyProfileResource resource);
 
     default GetClientsQuery toQuery(String holderId, String search, String status, int page, int size) {
         return new GetClientsQuery(holderId, Optional.ofNullable(search).filter(value -> !value.isBlank()),
@@ -98,16 +99,49 @@ public interface ClientAssembler {
                         "Status must be INVITED, ACTIVE or INACTIVE"));
     }
 
+    @Named("optionalText")
+    default String optionalText(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
+    }
+
     // required by MapStruct: single-field VOs need an explicit converter.
     default UUID map(ClientId id) {
         return id == null ? null : id.value();
+    }
+
+    default ClientId mapClientId(UUID value) {
+        return value == null ? null : new ClientId(value);
     }
 
     default String map(FullName fullName) {
         return fullName == null ? null : fullName.value();
     }
 
+    default FullName mapFullName(String value) {
+        return value == null ? null : new FullName(value);
+    }
+
     default String map(Email email) {
         return email == null ? null : email.value();
+    }
+
+    default Email mapEmail(String value) {
+        return value == null ? null : new Email(value);
+    }
+
+    default String map(TrainingGoal goal) {
+        return goal == null ? null : goal.value();
+    }
+
+    default TrainingGoal mapTrainingGoal(String value) {
+        return new TrainingGoal(value);
+    }
+
+    default Height mapHeight(Integer centimeters) {
+        return new Height(centimeters);
+    }
+
+    default BodyWeight mapBodyWeight(BigDecimal kilograms) {
+        return new BodyWeight(kilograms);
     }
 }

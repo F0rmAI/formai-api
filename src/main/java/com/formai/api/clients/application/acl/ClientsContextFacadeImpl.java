@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// Open Host Service: publishes a trainer's clients in clients' Published Language
-// (shared.contracts.clients). Always scoped to the trainer that asks.
 @Service
 public class ClientsContextFacadeImpl implements ClientsContextFacade {
 
@@ -35,7 +33,6 @@ public class ClientsContextFacadeImpl implements ClientsContextFacade {
                 .map(this::toSummary);
     }
 
-    // An unknown status matches no client.
     @Override
     public ClientSummaryPage fetchClientsOfTrainer(ClientListRequest request) {
         var status = request.status().map(ClientsContextFacadeImpl::toStatus);

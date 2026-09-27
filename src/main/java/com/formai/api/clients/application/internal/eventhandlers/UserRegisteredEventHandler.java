@@ -11,9 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// One transaction, one aggregate: the sign-up only creates the iam User; once that is
-// committed, this creates the Trainer with the name given at sign-up. fallbackExecution:
-// iam publishes its events without a transaction, and without it they would be dropped.
+// fallbackExecution: iam publishes its events outside a transaction; without it Spring drops them.
 @Component
 public class UserRegisteredEventHandler {
 

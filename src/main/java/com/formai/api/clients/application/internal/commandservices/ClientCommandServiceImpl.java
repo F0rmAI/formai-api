@@ -45,7 +45,6 @@ public class ClientCommandServiceImpl implements ClientCommandService {
         this.eventPublisher = eventPublisher;
     }
 
-    // Creates the client's iam account (pending activation) and shows its code on screen (FR-003).
     @Override
     @Transactional
     public Optional<RegisteredClient> handle(RegisterClientCommand command) {
@@ -68,7 +67,6 @@ public class ClientCommandServiceImpl implements ClientCommandService {
         return Optional.of(clientRepository.save(client));
     }
 
-    // The previous code stops working as soon as iam issues the new one.
     @Override
     @Transactional
     public Optional<ActivationTicket> handle(RenewActivationCodeCommand command) {
@@ -89,8 +87,6 @@ public class ClientCommandServiceImpl implements ClientCommandService {
                 .ifPresent(this::activate);
     }
 
-    // The client can no longer sign in, but nothing is deleted; planning closes the
-    // current assignment when it hears ClientDeactivated (FR-006).
     @Override
     @Transactional
     public Optional<Client> handle(DeactivateClientCommand command) {
@@ -122,8 +118,6 @@ public class ClientCommandServiceImpl implements ClientCommandService {
         return Optional.of(saved);
     }
 
-    // Every trainer write on a client first catches up with an activation whose event was
-    // lost: an INVITED client whose iam account is already active becomes ACTIVE.
     private Client findOwnClient(ClientId clientId, String holderId) {
         var client = clientRepository.findByIdAndHolderId(clientId, holderId)
                 .orElseThrow(ClientNotFoundException::new);

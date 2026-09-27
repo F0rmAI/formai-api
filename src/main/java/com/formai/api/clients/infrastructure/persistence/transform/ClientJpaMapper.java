@@ -20,8 +20,6 @@ import org.mapstruct.MappingTarget;
 import java.util.ArrayList;
 import java.util.UUID;
 
-// The body profile is optional in the domain and split in two on the table (the profile
-// columns plus the weight history rows), so it is mapped by hand after the rest.
 @Mapper(componentModel = "spring")
 public interface ClientJpaMapper {
 

@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-// ACL over iam's Open Host Service: a client's id is the id of their iam account.
 @Service
 public class ExternalIamService {
 
@@ -21,12 +20,10 @@ public class ExternalIamService {
         this.iamContextFacade = iamContextFacade;
     }
 
-    // Empty when the email already belongs to another account.
     public Optional<ActivationTicket> createClientAccount(Email email) {
         return iamContextFacade.createClientAccount(email.value()).map(this::toTicket);
     }
 
-    // Empty when the account no longer waits for activation.
     public Optional<ActivationTicket> renewActivationCode(ClientId clientId) {
         return iamContextFacade.reissueActivationCode(clientId.value()).map(this::toTicket);
     }

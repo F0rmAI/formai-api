@@ -9,8 +9,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-// The client's data the trainer plans with. Health data: only the client's own trainer
-// reads it. Every weight change is kept with its date (FR-007).
 public class BodyProfile {
 
     private TrainingGoal goal;
@@ -25,7 +23,6 @@ public class BodyProfile {
         this.restrictions = restrictions;
     }
 
-    // Restores a saved profile as it was, history included.
     public BodyProfile(TrainingGoal goal, Height height, BodyWeight currentWeight, String restrictions,
                        List<BodyWeightRecord> weightHistory) {
         this.goal = goal;
@@ -35,7 +32,6 @@ public class BodyProfile {
         this.weightHistory = new ArrayList<>(weightHistory);
     }
 
-    // Records the weight only when it changes, so saving the same profile twice adds no entry.
     public void recordWeight(BodyWeight weight, LocalDate on) {
         if (currentWeight != null && currentWeight.kilograms().compareTo(weight.kilograms()) == 0) {
             return;

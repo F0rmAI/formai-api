@@ -40,9 +40,6 @@ public class ClientQueryServiceImpl implements ClientQueryService {
                 });
     }
 
-    // A safe read: it stores nothing. If the AccountActivated event was lost, the client is
-    // still INVITED here while iam already has the account active; it is shown as ACTIVE and
-    // the trainer's next write on that client stores the change.
     private void showActivation(Client client) {
         if (client.getStatus() == ClientStatus.INVITED && externalIamService.isAccountActive(client.getId())) {
             client.activate();

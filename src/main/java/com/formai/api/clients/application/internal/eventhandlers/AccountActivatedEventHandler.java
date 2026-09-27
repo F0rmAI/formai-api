@@ -10,9 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// The client activated their iam account in the app: the Client becomes ACTIVE. If this
-// fails, ClientQueryService and the trainer's next write catch up with it. fallbackExecution:
-// iam publishes its events without a transaction, and without it they would be dropped.
+// fallbackExecution: iam publishes its events outside a transaction; without it Spring drops them.
 @Component
 public class AccountActivatedEventHandler {
 

@@ -18,7 +18,6 @@ public class TrainerCommandServiceImpl implements TrainerCommandService {
         this.trainerRepository = trainerRepository;
     }
 
-    // Idempotent: a replayed UserRegistered returns the trainer already registered.
     @Override
     @Transactional
     public Optional<Trainer> handle(RegisterTrainerCommand command) {
