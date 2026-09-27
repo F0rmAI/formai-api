@@ -3,11 +3,14 @@ package com.formai.api.tracking.application.internal.queryservices;
 import com.formai.api.tracking.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.tracking.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.tracking.domain.model.queries.GetClientOverviewsQuery;
+import com.formai.api.tracking.domain.model.queries.GetExerciseProgressQuery;
+import com.formai.api.tracking.domain.model.queries.GetProgressReportQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutHistoryQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutSessionByIdQuery;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
+import com.formai.api.tracking.domain.model.valueobjects.ProgressWindow;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
 import com.formai.api.tracking.domain.model.valueobjects.TrainerClient;
 import com.formai.api.tracking.domain.model.valueobjects.TrainerClientPage;
@@ -20,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +31,7 @@ import java.util.stream.IntStream;
 
 import static com.formai.api.tracking.TrackingTestData.CLIENT_HOLDER_ID;
 import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
+import static com.formai.api.tracking.TrackingTestData.SQUAT;
 import static com.formai.api.tracking.TrackingTestData.TODAY;
 import static com.formai.api.tracking.TrackingTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.tracking.TrackingTestData.activeRoutine;
@@ -131,8 +136,6 @@ class WorkoutSessionQueryServiceImplTest {
         assertThat(result.totalElements()).isZero();
     }
 
-    // --- Client overviews (FR-006) ---------------------------------------------------------
-
     @Test
     void shouldAddTheCurrentRoutineAndTheLastWorkoutToEachClient() {
         var other = new ClientId(UUID.fromString("55555555-5555-5555-5555-555555555555"));
@@ -167,5 +170,41 @@ class WorkoutSessionQueryServiceImplTest {
 
         assertThat(page.items()).isEmpty();
         verifyNoInteractions(activeRoutineRepository, workoutSessionRepository);
+    }
+
+    @Test
+    void shouldReportTheProgressOfTheTrainersClient() {
+        var period = new ReportPeriod(TODAY.minusDays(27), TODAY);
+        when(externalClientsService.isClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(true);
+        when(workoutSessionRepository.findAllByClientIdAndPeriod(CLIENT_ID, period)).thenReturn(List.of(pendingSession(TODAY)));
+
+        var report = queryService.handle(new GetProgressReportQuery(CLIENT_ID, TRAINER_HOLDER_ID, period));
+
+        assertThat(report.scheduled()).isEqualTo(1);
+        assertThat(report.hasData()).isFalse();
+    }
+
+    @Test
+    void shouldDenyTheProgressOfAnotherTrainersClient() {
+        when(externalClientsService.isClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> queryService.handle(new GetProgressReportQuery(CLIENT_ID, TRAINER_HOLDER_ID,
+                new ReportPeriod(TODAY.minusDays(27), TODAY))))
+                .isInstanceOf(ClientAccessDeniedException.class);
+        verifyNoInteractions(workoutSessionRepository);
+    }
+
+    @Test
+    void shouldChartTheClientsOwnExerciseOverTheChosenWeeks() {
+        var squat = SQUAT.exerciseId();
+        when(workoutSessionRepository.findAllByClientIdAndExerciseIdSince(CLIENT_ID, squat,
+                LocalDate.now().minusWeeks(8))).thenReturn(List.of());
+
+        var progress = queryService.handle(new GetExerciseProgressQuery(CLIENT_ID, CLIENT_HOLDER_ID, squat,
+                ProgressWindow.WEEKS_8));
+
+        assertThat(progress.window()).isEqualTo(ProgressWindow.WEEKS_8);
+        assertThat(progress.enoughData()).isFalse();
+        verifyNoInteractions(externalClientsService);
     }
 }
