@@ -15,8 +15,6 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 import java.util.UUID;
 
-// Open Host Service: publishes the client's current routine, at its latest version, in
-// planning's Published Language (shared.contracts.planning).
 @Service
 public class PlanningContextFacadeImpl implements PlanningContextFacade {
 

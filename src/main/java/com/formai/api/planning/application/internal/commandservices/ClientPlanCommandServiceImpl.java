@@ -38,8 +38,6 @@ public class ClientPlanCommandServiceImpl implements ClientPlanCommandService {
         this.eventPublisher = eventPublisher;
     }
 
-    // One client per call (one operation, one aggregate): assigning to several clients
-    // runs this once for each of them.
     @Override
     @Transactional
     public Optional<ClientPlan> handle(AssignRoutineCommand command) {

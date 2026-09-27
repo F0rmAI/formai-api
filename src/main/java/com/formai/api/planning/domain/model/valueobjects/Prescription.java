@@ -4,8 +4,6 @@ import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
 
 import java.math.BigDecimal;
 
-// What the trainer prescribes for one exercise: sets and reps must be greater than zero,
-// target load and rest zero or more (FR-008).
 public record Prescription(int sets, int reps, BigDecimal targetLoadKg, int restSeconds) {
 
     public Prescription {

@@ -53,7 +53,6 @@ public class ExerciseCommandServiceImpl implements ExerciseCommandService {
         return Optional.of(exerciseRepository.save(exercise));
     }
 
-    // An exercise used by any routine can only be archived, so routines never lose it (FR-009).
     @Override
     @Transactional
     public void handle(DeleteExerciseCommand command) {

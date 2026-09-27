@@ -16,8 +16,6 @@ public interface RoutineJpaRepository extends JpaRepository<RoutineJpaEntity, UU
 
     Page<RoutineJpaEntity> findAllByHolderId(String holderId, Pageable pagination);
 
-    // The prescribed exercises live in each version's JSON document, so any version that
-    // mentions the exercise id counts as using it.
     @Query("select case when count(r) > 0 then true else false end from RoutineJpaEntity r join r.versions v "
             + "where r.holderId = :holderId and v.sessionsJson like concat('%', :exerciseId, '%')")
     boolean anyVersionMentions(@Param("holderId") String holderId, @Param("exerciseId") String exerciseId);

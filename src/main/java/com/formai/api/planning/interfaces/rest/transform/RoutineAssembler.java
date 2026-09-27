@@ -23,6 +23,7 @@ import com.formai.api.planning.interfaces.rest.resources.RoutineVersionResource;
 import com.formai.api.planning.interfaces.rest.resources.UpdateRoutineResource;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,8 +32,8 @@ import java.util.stream.IntStream;
 @Mapper(componentModel = "spring")
 public interface RoutineAssembler {
 
-    @Mapping(target = "currentVersion", expression = "java(routine.currentVersion().getNumber())")
-    @Mapping(target = "sessions", expression = "java(toSessionResources(routine.currentVersion().getSessions()))")
+    @Mapping(target = "currentVersion", source = ".", qualifiedByName = "currentVersionNumber")
+    @Mapping(target = "sessions", source = ".", qualifiedByName = "currentSessions")
     RoutineResource toResource(Routine routine);
 
     @Mapping(target = "content", source = "items")
@@ -52,21 +53,33 @@ public interface RoutineAssembler {
     @Mapping(target = "restSeconds", source = "prescription.restSeconds")
     PrescribedExerciseResource toResource(PrescribedExercise exercise);
 
-    default CreateRoutineCommand toCommand(String holderId, CreateRoutineResource resource) {
-        return new CreateRoutineCommand(holderId, new RoutineName(resource.name()), toSessions(resource.sessions()));
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "name", source = "resource.name")
+    @Mapping(target = "sessions", source = "resource.sessions", qualifiedByName = "toSessions")
+    CreateRoutineCommand toCommand(String holderId, CreateRoutineResource resource);
+
+    @Mapping(target = "routineId", source = "routineId")
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "name", source = "resource.name")
+    @Mapping(target = "sessions", source = "resource.sessions", qualifiedByName = "toSessions")
+    UpdateRoutineCommand toCommand(UUID routineId, String holderId, UpdateRoutineResource resource);
+
+    @Mapping(target = "routineId", source = "routineId")
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "name", source = "resource.name")
+    DuplicateRoutineCommand toCommand(UUID routineId, String holderId, CreateRoutineDuplicateResource resource);
+
+    @Named("currentVersionNumber")
+    default int currentVersionNumber(Routine routine) {
+        return routine.currentVersion().getNumber();
     }
 
-    default UpdateRoutineCommand toCommand(UUID routineId, String holderId, UpdateRoutineResource resource) {
-        return new UpdateRoutineCommand(new RoutineId(routineId), holderId, new RoutineName(resource.name()),
-                toSessions(resource.sessions()));
+    @Named("currentSessions")
+    default List<RoutineSessionResource> currentSessions(Routine routine) {
+        return toSessionResources(routine.currentVersion().getSessions());
     }
 
-    default DuplicateRoutineCommand toCommand(UUID routineId, String holderId, CreateRoutineDuplicateResource resource) {
-        return new DuplicateRoutineCommand(new RoutineId(routineId), holderId, new RoutineName(resource.name()));
-    }
-
-    // Sessions are numbered from 1 in the order they were sent. Exercise names are filled
-    // in from the catalog by the command service.
+    @Named("toSessions")
     default List<RoutineSession> toSessions(List<CreateRoutineSessionResource> sessions) {
         return IntStream.range(0, sessions.size())
                 .mapToObj(index -> {
@@ -85,11 +98,19 @@ public interface RoutineAssembler {
         return id == null ? null : id.value();
     }
 
+    default RoutineId mapRoutineId(UUID value) {
+        return value == null ? null : new RoutineId(value);
+    }
+
     default UUID map(ExerciseId id) {
         return id == null ? null : id.value();
     }
 
     default String map(RoutineName name) {
         return name == null ? null : name.value();
+    }
+
+    default RoutineName mapRoutineName(String value) {
+        return value == null ? null : new RoutineName(value);
     }
 }

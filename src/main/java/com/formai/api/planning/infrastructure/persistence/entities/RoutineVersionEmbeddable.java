@@ -17,7 +17,6 @@ public class RoutineVersionEmbeddable {
     @Column(name = "author", nullable = false, length = 64)
     private String author;
 
-    // A version is immutable and always read as a whole, so its sessions are one JSON document.
     @Column(name = "sessions_json", nullable = false, columnDefinition = "text")
     private String sessionsJson;
 

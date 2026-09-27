@@ -33,7 +33,6 @@ public class RoutineQueryServiceImpl implements RoutineQueryService {
         return routineRepository.findByIdAndHolderId(query.routineId(), query.holderId());
     }
 
-    // Most recent version first; empty when the routine does not exist for this trainer.
     @Override
     public List<RoutineVersion> handle(GetRoutineVersionsQuery query) {
         return routineRepository.findByIdAndHolderId(query.routineId(), query.holderId())

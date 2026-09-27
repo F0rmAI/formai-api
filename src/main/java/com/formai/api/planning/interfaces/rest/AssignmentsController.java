@@ -30,7 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-// Served by planning under the clients' path: clients never depends on planning.
+// Composition controller: /clients/{id}/assignments borrows the namespace of the clients module's
+// Client aggregate. It lives in planning because planning already depends on clients: serving this
+// route from clients would make clients depend on planning and close a cycle. It holds no
+// business logic; the rules live in the planning domain.
 @Tag(name = "Routines", description = "Routines with sessions and prescribed exercises, their version history, " +
         "and their assignment to clients.")
 @RestController
@@ -55,7 +58,7 @@ public class AssignmentsController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The assignments",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = AssignmentResource.class)))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content)
     })
     @GetMapping
     public ResponseEntity<List<AssignmentResource>> getByClient(@PathVariable UUID id, Authentication authentication) {

@@ -3,8 +3,6 @@ package com.formai.api.planning.domain.model.entities;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.Prescription;
 
-// A catalog exercise inside a routine session. The exercise name is copied when it is
-// prescribed, so archiving or renaming the catalog entry never changes a routine (FR-009).
 public class PrescribedExercise {
 
     private final ExerciseId exerciseId;

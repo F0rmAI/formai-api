@@ -10,8 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// One transaction, one aggregate: assigning changes the ClientPlan and, once that is
-// committed, this marks the Routine ACTIVE in its own transaction (REQUIRES_NEW).
 // Explicit bean name: tracking has an event handler with the same simple name.
 @Component("planningRoutineAssignedEventHandler")
 public class RoutineAssignedEventHandler {

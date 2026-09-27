@@ -2,7 +2,6 @@ package com.formai.api.planning.domain.model.valueobjects;
 
 import java.time.LocalDate;
 
-// endDate is null while the assignment is still in effect.
 public record AssignmentPeriod(LocalDate startDate, LocalDate endDate) {
 
     public AssignmentPeriod {

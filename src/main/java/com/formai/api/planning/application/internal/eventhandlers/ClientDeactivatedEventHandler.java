@@ -12,8 +12,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDate;
 
-// A deactivated client keeps its history, but its current assignment is closed today;
-// tracking then ends the client's active routine through AssignmentClosed.
 @Component
 public class ClientDeactivatedEventHandler {
 

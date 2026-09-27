@@ -78,7 +78,7 @@ public class RoutinesController {
                     content = @Content(schema = @Schema(implementation = RoutineResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing name, sessions or prescription values",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "An exercise is not in the catalog", content = @Content),
             @ApiResponse(responseCode = "422", description = "No sessions, a session without exercises, sets or " +
                     "reps of zero or less, a negative load or rest, or an archived exercise", content = @Content)
@@ -95,7 +95,7 @@ public class RoutinesController {
             @ApiResponse(responseCode = "200", description = "A page of routines",
                     content = @Content(schema = @Schema(implementation = RoutinePageResource.class))),
             @ApiResponse(responseCode = "400", description = "Invalid page or size", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content)
     })
     @GetMapping
     public ResponseEntity<RoutinePageResource> getAll(@RequestParam(defaultValue = "0") @Min(0) int page,
@@ -109,7 +109,7 @@ public class RoutinesController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The routine",
                     content = @Content(schema = @Schema(implementation = RoutineResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine", content = @Content)
     })
     @GetMapping("/{id}")
@@ -126,7 +126,7 @@ public class RoutinesController {
                     content = @Content(schema = @Schema(implementation = RoutineResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing name, sessions or prescription values",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine, or an exercise not in the catalog",
                     content = @Content),
             @ApiResponse(responseCode = "422", description = "No sessions, a session without exercises, sets or " +
@@ -144,7 +144,7 @@ public class RoutinesController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The versions",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = RoutineVersionResource.class)))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine", content = @Content)
     })
     @GetMapping("/{id}/versions")
@@ -164,7 +164,7 @@ public class RoutinesController {
             @ApiResponse(responseCode = "201", description = "Copy created",
                     content = @Content(schema = @Schema(implementation = RoutineResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing name", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine", content = @Content)
     })
     @PostMapping("/{id}/duplicates")
@@ -183,7 +183,7 @@ public class RoutinesController {
             @ApiResponse(responseCode = "201", description = "One current assignment per client",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = AssignmentResource.class)))),
             @ApiResponse(responseCode = "400", description = "No clients or no start date", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine, or a client that is not yours",
                     content = @Content),
             @ApiResponse(responseCode = "422", description = "A client is not active", content = @Content)

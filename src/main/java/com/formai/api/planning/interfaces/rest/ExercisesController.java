@@ -61,7 +61,7 @@ public class ExercisesController {
                     content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing name or muscle group, or too long",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "409", description = "An exercise with this name is already in the catalog",
                     content = @Content)
     })
@@ -79,7 +79,7 @@ public class ExercisesController {
                     content = @Content(schema = @Schema(implementation = ExercisePageResource.class))),
             @ApiResponse(responseCode = "400", description = "Unknown status, or an invalid page or size",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content)
     })
     @GetMapping
     public ResponseEntity<ExercisePageResource> getAll(@RequestParam(required = false) String search,
@@ -95,7 +95,7 @@ public class ExercisesController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The exercise",
                     content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such exercise in the catalog", content = @Content)
     })
     @GetMapping("/{id}")
@@ -109,7 +109,7 @@ public class ExercisesController {
             description = "Only an exercise that no routine uses can be deleted; otherwise archive it.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Exercise deleted"),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such exercise in the catalog", content = @Content),
             @ApiResponse(responseCode = "409", description = "The exercise is used in a routine: archive it instead",
                     content = @Content)
@@ -125,7 +125,7 @@ public class ExercisesController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Exercise archived",
                     content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such exercise in the catalog", content = @Content)
     })
     @PostMapping("/{id}/archivals")
@@ -139,7 +139,7 @@ public class ExercisesController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Exercise restored",
                     content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such exercise in the catalog", content = @Content)
     })
     @PostMapping("/{id}/restorations")

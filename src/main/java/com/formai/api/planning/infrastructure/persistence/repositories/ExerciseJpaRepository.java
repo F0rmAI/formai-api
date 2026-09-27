@@ -25,12 +25,10 @@ public interface ExerciseJpaRepository extends JpaRepository<ExerciseJpaEntity, 
     Page<ExerciseJpaEntity> search(@Param("holderId") String holderId, @Param("search") String search,
                                    @Param("statuses") Collection<String> statuses, Pageable pagination);
 
-    // Duplicates are detected ignoring case: "Squat" and "squat" are the same exercise.
     default boolean existsByHolderIdAndName(String holderId, String name) {
         return existsByHolderIdAndNameIgnoreCase(holderId, name);
     }
 
-    // No search matches every name, and no status matches both.
     default Page<ExerciseJpaEntity> findAllByHolderId(String holderId, Optional<String> search,
                                                      Optional<String> status, Pageable pagination) {
         return search(holderId, search.orElse(""), status.map(List::of).orElse(ALL_STATUSES), pagination);

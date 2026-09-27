@@ -8,8 +8,6 @@ import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 
 import java.util.UUID;
 
-// An entry in a trainer's own exercise catalog. Archiving hides it from new routines
-// without touching the routines that already use it (FR-009).
 public class Exercise {
 
     private ExerciseId id;

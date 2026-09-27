@@ -26,8 +26,6 @@ public interface RoutineJpaMapper {
     ObjectMapper JSON = new ObjectMapper();
     TypeReference<List<SessionJson>> SESSIONS = new TypeReference<>() { };
 
-    // The stored JSON shape of a version's sessions, kept apart from the domain entities so
-    // the domain never depends on Jackson.
     record SessionJson(int order, String label, List<PrescribedExerciseJson> exercises) { }
 
     record PrescribedExerciseJson(UUID exerciseId, String exerciseName, int sets, int reps,
@@ -39,21 +37,13 @@ public interface RoutineJpaMapper {
     @Mapping(target = "duplicate", ignore = true)
     Routine toDomain(RoutineJpaEntity entity);
 
-    default RoutineVersionEmbeddable toEmbeddable(RoutineVersion version) {
-        var embeddable = new RoutineVersionEmbeddable();
-        embeddable.setNumber(version.getNumber());
-        embeddable.setChangedAt(version.getChangedAt());
-        embeddable.setAuthor(version.getAuthor());
-        embeddable.setSessionsJson(writeSessions(version.getSessions()));
-        return embeddable;
-    }
+    @Mapping(target = "sessionsJson", source = "sessions")
+    RoutineVersionEmbeddable toEmbeddable(RoutineVersion version);
 
-    default RoutineVersion toVersion(RoutineVersionEmbeddable embeddable) {
-        return new RoutineVersion(embeddable.getNumber(), embeddable.getChangedAt(), embeddable.getAuthor(),
-                readSessions(embeddable.getSessionsJson()));
-    }
+    @Mapping(target = "sessions", source = "sessionsJson")
+    RoutineVersion toVersion(RoutineVersionEmbeddable embeddable);
 
-    private String writeSessions(List<RoutineSession> sessions) {
+    default String writeSessions(List<RoutineSession> sessions) {
         var json = sessions.stream()
                 .map(session -> new SessionJson(session.getOrder(), session.getLabel(), session.getExercises().stream()
                         .map(exercise -> {
@@ -67,11 +57,11 @@ public interface RoutineJpaMapper {
         try {
             return JSON.writeValueAsString(json);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not serialize the routine sessions", e);
+            throw new RoutineSessionsStorageException("Could not serialize the routine sessions", e);
         }
     }
 
-    private List<RoutineSession> readSessions(String sessionsJson) {
+    default List<RoutineSession> readSessions(String sessionsJson) {
         try {
             return JSON.readValue(sessionsJson, SESSIONS).stream()
                     .map(session -> new RoutineSession(session.order(), session.label(), session.exercises().stream()
@@ -81,7 +71,7 @@ public interface RoutineJpaMapper {
                             .toList()))
                     .toList();
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not read the stored routine sessions", e);
+            throw new RoutineSessionsStorageException("Could not read the stored routine sessions", e);
         }
     }
 

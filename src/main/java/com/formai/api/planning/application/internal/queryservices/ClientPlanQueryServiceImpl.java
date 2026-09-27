@@ -29,9 +29,6 @@ public class ClientPlanQueryServiceImpl implements ClientPlanQueryService {
         return clientPlanRepository.findByClientIdAndHolderId(query.clientId(), query.holderId());
     }
 
-    // The assignment in effect today. A new assignment with a later start date only closes
-    // the previous one from the day before, so until then the previous one is still served;
-    // with none in effect, the open (upcoming) one is.
     @Override
     public Optional<ActiveAssignment> handle(GetActiveAssignmentByClientIdQuery query) {
         var today = LocalDate.now();

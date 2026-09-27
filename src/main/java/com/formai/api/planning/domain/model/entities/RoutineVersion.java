@@ -3,8 +3,6 @@ package com.formai.api.planning.domain.model.entities;
 import java.time.Instant;
 import java.util.List;
 
-// An immutable snapshot of a routine: every saved change adds a new one, and the previous
-// versions stay as the routine's history (FR-011).
 public class RoutineVersion {
 
     private final int number;

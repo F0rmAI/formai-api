@@ -6,8 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-// ACL over clients' Open Host Service. Explicit bean name: tracking has its own
-// ExternalClientsService.
+// Explicit bean name: tracking has its own ExternalClientsService.
 @Service("planningExternalClientsService")
 public class ExternalClientsService {
 
@@ -19,8 +18,6 @@ public class ExternalClientsService {
         this.clientsContextFacade = clientsContextFacade;
     }
 
-    // Empty when the client does not exist or belongs to another trainer; otherwise whether
-    // the client is active and can therefore receive a routine.
     public Optional<Boolean> isActiveClientOfTrainer(ClientId clientId, String holderId) {
         return clientsContextFacade.fetchClientOfTrainer(clientId.value(), holderId)
                 .map(client -> ACTIVE.equals(client.status()));

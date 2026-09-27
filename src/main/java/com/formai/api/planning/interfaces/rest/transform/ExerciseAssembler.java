@@ -14,6 +14,7 @@ import com.formai.api.planning.interfaces.rest.resources.ExercisePageResource;
 import com.formai.api.planning.interfaces.rest.resources.ExerciseResource;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -29,10 +30,11 @@ public interface ExerciseAssembler {
     @Mapping(target = "content", source = "items")
     ExercisePageResource toResource(ExercisePage page);
 
-    default CreateExerciseCommand toCommand(String holderId, CreateExerciseResource resource) {
-        return new CreateExerciseCommand(holderId, new ExerciseName(resource.name()),
-                new MuscleGroup(resource.muscleGroup()), Optional.ofNullable(resource.equipment()));
-    }
+    @Mapping(target = "holderId", source = "holderId")
+    @Mapping(target = "name", source = "resource.name")
+    @Mapping(target = "muscleGroup", source = "resource.muscleGroup")
+    @Mapping(target = "equipment", source = "resource.equipment", qualifiedByName = "optionalText")
+    CreateExerciseCommand toCommand(String holderId, CreateExerciseResource resource);
 
     default GetExercisesQuery toQuery(String holderId, String search, String status, int page, int size) {
         return new GetExercisesQuery(holderId, Optional.ofNullable(search).filter(value -> !value.isBlank()),
@@ -51,6 +53,11 @@ public interface ExerciseAssembler {
                         "Status must be ACTIVE or ARCHIVED"));
     }
 
+    @Named("optionalText")
+    default Optional<String> optionalText(String value) {
+        return Optional.ofNullable(value);
+    }
+
     // required by MapStruct: single-field VOs need an explicit converter.
     default UUID map(ExerciseId id) {
         return id == null ? null : id.value();
@@ -60,7 +67,15 @@ public interface ExerciseAssembler {
         return name == null ? null : name.value();
     }
 
+    default ExerciseName mapExerciseName(String value) {
+        return value == null ? null : new ExerciseName(value);
+    }
+
     default String map(MuscleGroup muscleGroup) {
         return muscleGroup == null ? null : muscleGroup.value();
+    }
+
+    default MuscleGroup mapMuscleGroup(String value) {
+        return value == null ? null : new MuscleGroup(value);
     }
 }

@@ -7,6 +7,5 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-// Sessions are numbered in the order they are sent.
 public record CreateRoutineSessionResource(@NotBlank @Size(max = 120) String label,
                                            @NotNull @Valid List<CreatePrescribedExerciseResource> exercises) { }

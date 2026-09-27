@@ -12,8 +12,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// Every routine ever assigned to one client. A client has at most one current assignment:
-// a new one closes the previous, which stays in the history (FR-010).
 public class ClientPlan {
 
     private ClientPlanId id;
@@ -34,8 +32,6 @@ public class ClientPlan {
         return plan;
     }
 
-    // The previous assignment ends the day before the new one starts (or on its own start
-    // date, if the new one starts that same day or earlier).
     public Assignment assign(AssignRoutineCommand command) {
         currentAssignment().ifPresent(current -> {
             var endDate = command.startDate().minusDays(1);
