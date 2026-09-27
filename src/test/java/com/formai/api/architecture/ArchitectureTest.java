@@ -67,15 +67,14 @@ class ArchitectureTest {
         noClasses().that().resideInAPackage("com.formai.api.shared..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
-                        "com.formai.api.iam.domain..",
-                        "com.formai.api.iam.application..",
-                        "com.formai.api.iam.infrastructure..")
+                        "com.formai.api.(*).domain..",
+                        "com.formai.api.(*).application..",
+                        "com.formai.api.(*).infrastructure..")
                 .check(importedClasses);
     }
 
-    // Naming — fachadas OHS (si se agregan) viven en interfaces.acl.
-    // allowEmptyShould(true): hoy ningún BC necesita fachada OHS todavía — la regla
-    // queda lista para cuando se agregue una.
+    // Naming — fachadas OHS viven en interfaces.acl.
+    // allowEmptyShould(true): la regla no falla en un monolito que todavía no tiene fachadas.
     @Test
     void contextFacadesResideInInterfacesAcl() {
         classes().that().haveSimpleNameEndingWith("ContextFacade")
