@@ -34,9 +34,12 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()   // healthchecks send no JWT
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Roles are additive (iam.domain.model.valueobjects.Role) and land as
-                        // ROLE_<name> authorities via JwtAuthenticationFilter. To restrict a
-                        // route to a specific role, add a matcher BEFORE anyRequest().authenticated():
-                        // .requestMatchers("/api/v1/admin/**").hasAuthority("ROLE_ADMINISTRATOR")
+                        // ROLE_<name> authorities via JwtAuthenticationFilter (FR-002): the web
+                        // app is for trainers, the mobile app for clients. Any other role gets 403.
+                        .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/routines/**",
+                                "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
+                        .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**")
+                                .hasAuthority("ROLE_CLIENT")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

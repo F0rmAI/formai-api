@@ -42,7 +42,7 @@ class ActiveRoutinesControllerTest {
     ActiveRoutineQueryService activeRoutineQueryService;
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnTheRoutineWithTodaysSession() throws Exception {
         var today = pendingSession(TODAY);
         when(activeRoutineQueryService.handle(argThat((GetActiveRoutineQuery query) ->
@@ -60,7 +60,7 @@ class ActiveRoutinesControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturnNullTodayFieldsWhenNothingIsScheduledToday() throws Exception {
         when(activeRoutineQueryService.handle(any(GetActiveRoutineQuery.class)))
                 .thenReturn(Optional.of(new TodayPlan(activeRoutine(), Optional.empty())));
@@ -72,7 +72,7 @@ class ActiveRoutinesControllerTest {
     }
 
     @Test
-    @WithMockUser(username = CLIENT_HOLDER_ID)
+    @WithMockUser(username = CLIENT_HOLDER_ID, roles = "CLIENT")
     void shouldReturn404WhenTheClientHasNoRoutine() throws Exception {
         when(activeRoutineQueryService.handle(any(GetActiveRoutineQuery.class)))
                 .thenThrow(new ActiveRoutineNotFoundException());

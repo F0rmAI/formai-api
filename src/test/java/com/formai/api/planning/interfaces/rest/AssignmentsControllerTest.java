@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AssignmentsController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, ClientPlanAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID)
+@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class AssignmentsControllerTest {
 
     @Autowired

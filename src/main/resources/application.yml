@@ -36,7 +36,7 @@ tracking:
 
 documentation:
   application:
-    description: 'FormAI API — modular monolith (Bounded Contexts: iam, planning, tracking)'
+    description: 'FormAI API — modular monolith (Bounded Contexts: iam, clients, planning, tracking)'
     version: '@project.version@'
 
 management:

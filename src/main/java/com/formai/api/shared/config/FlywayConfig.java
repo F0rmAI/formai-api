@@ -22,6 +22,17 @@ public class FlywayConfig {
     }
 
     @Bean
+    public FlywayMigrationInitializer clientsFlywayMigrationInitializer(DataSource dataSource) {
+        var flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("clients")
+                .table("flyway_clients")
+                .locations("classpath:db/migration/clients")
+                .load();
+        return new FlywayMigrationInitializer(flyway, null);
+    }
+
+    @Bean
     public FlywayMigrationInitializer planningFlywayMigrationInitializer(DataSource dataSource) {
         var flyway = Flyway.configure()
                 .dataSource(dataSource)

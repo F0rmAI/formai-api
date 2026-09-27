@@ -52,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, RoutineAssemblerImpl.class,
         ClientPlanAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID)
+@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class RoutinesControllerTest {
 
     private static final String ROUTINE_BODY = "{\"name\":\"Legs only\",\"sessions\":[{\"label\":\"Day A\","

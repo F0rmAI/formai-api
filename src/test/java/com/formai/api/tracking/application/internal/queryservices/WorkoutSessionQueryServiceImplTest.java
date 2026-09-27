@@ -2,11 +2,17 @@ package com.formai.api.tracking.application.internal.queryservices;
 
 import com.formai.api.tracking.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.tracking.domain.exceptions.ClientAccessDeniedException;
+import com.formai.api.tracking.domain.model.queries.GetClientOverviewsQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutHistoryQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutSessionByIdQuery;
+import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
+import com.formai.api.tracking.domain.model.valueobjects.TrainerClient;
+import com.formai.api.tracking.domain.model.valueobjects.TrainerClientPage;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionPage;
+import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import com.formai.api.tracking.domain.repositories.WorkoutSessionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,12 +22,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.IntStream;
 
 import static com.formai.api.tracking.TrackingTestData.CLIENT_HOLDER_ID;
 import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
 import static com.formai.api.tracking.TrackingTestData.TODAY;
 import static com.formai.api.tracking.TrackingTestData.TRAINER_HOLDER_ID;
+import static com.formai.api.tracking.TrackingTestData.activeRoutine;
 import static com.formai.api.tracking.TrackingTestData.pendingSession;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +46,9 @@ class WorkoutSessionQueryServiceImplTest {
 
     @Mock
     WorkoutSessionRepository workoutSessionRepository;
+
+    @Mock
+    ActiveRoutineRepository activeRoutineRepository;
 
     @Mock
     ExternalClientsService externalClientsService;
@@ -118,5 +129,43 @@ class WorkoutSessionQueryServiceImplTest {
 
         assertThat(result.items()).isEmpty();
         assertThat(result.totalElements()).isZero();
+    }
+
+    // --- Client overviews (FR-006) ---------------------------------------------------------
+
+    @Test
+    void shouldAddTheCurrentRoutineAndTheLastWorkoutToEachClient() {
+        var other = new ClientId(UUID.fromString("55555555-5555-5555-5555-555555555555"));
+        when(externalClientsService.fetchClientsOfTrainer(TRAINER_HOLDER_ID, Optional.empty(), Optional.of("ACTIVE"),
+                FIRST_PAGE)).thenReturn(new TrainerClientPage(List.of(
+                        new TrainerClient(CLIENT_ID, "Luis Ramos", "ACTIVE"),
+                        new TrainerClient(other, "Maria Diaz", "ACTIVE")), 0, 20, 2, 1));
+        when(activeRoutineRepository.findAllByClientIds(List.of(CLIENT_ID, other))).thenReturn(List.of(activeRoutine()));
+        when(workoutSessionRepository.findLastWorkoutDates(List.of(CLIENT_ID, other)))
+                .thenReturn(List.of(new LastWorkout(CLIENT_ID, TODAY.minusDays(2))));
+
+        var page = queryService.handle(new GetClientOverviewsQuery(TRAINER_HOLDER_ID, Optional.empty(),
+                Optional.of("ACTIVE"), FIRST_PAGE));
+
+        assertThat(page.items()).hasSize(2);
+        var luis = page.items().getFirst();
+        assertThat(luis.activeRoutineName()).contains(activeRoutine().getRoutineName());
+        assertThat(luis.lastWorkoutOn()).contains(TODAY.minusDays(2));
+        var maria = page.items().getLast();
+        assertThat(maria.activeRoutineName()).isEmpty();
+        assertThat(maria.lastWorkoutOn()).isEmpty();
+        assertThat(page.totalElements()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldNotReadTrackingDataForATrainerWithoutClients() {
+        when(externalClientsService.fetchClientsOfTrainer(TRAINER_HOLDER_ID, Optional.empty(), Optional.empty(),
+                FIRST_PAGE)).thenReturn(new TrainerClientPage(List.of(), 0, 20, 0, 0));
+
+        var page = queryService.handle(new GetClientOverviewsQuery(TRAINER_HOLDER_ID, Optional.empty(),
+                Optional.empty(), FIRST_PAGE));
+
+        assertThat(page.items()).isEmpty();
+        verifyNoInteractions(activeRoutineRepository, workoutSessionRepository);
     }
 }

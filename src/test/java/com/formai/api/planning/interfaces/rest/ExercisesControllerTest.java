@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(ExercisesController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, ExerciseAssemblerImpl.class})
 @TestPropertySource(properties = "formai.jwt.secret=test-secret-only-for-wiring-not-a-real-value")
-@WithMockUser(username = TRAINER_HOLDER_ID)
+@WithMockUser(username = TRAINER_HOLDER_ID, roles = "TRAINER")
 class ExercisesControllerTest {
 
     private static final String SQUAT_BODY = "{\"name\":\"Squat\",\"muscleGroup\":\"Legs\",\"equipment\":\"Barbell\"}";
@@ -155,5 +155,15 @@ class ExercisesControllerTest {
     void shouldRejectARequestWithoutJwt() throws Exception {
         mockMvc.perform(get("/api/v1/exercises"))
                 .andExpect(status().isForbidden());
+    }
+
+    // The catalog belongs to the trainer's web app: a client's token is not enough (FR-002).
+    @Test
+    @WithMockUser(username = TRAINER_HOLDER_ID, roles = "CLIENT")
+    void shouldReturn403ForAClientToken() throws Exception {
+        mockMvc.perform(get("/api/v1/exercises"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(exerciseQueryService);
     }
 }

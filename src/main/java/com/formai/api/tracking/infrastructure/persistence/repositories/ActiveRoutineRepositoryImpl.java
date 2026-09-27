@@ -43,4 +43,10 @@ public class ActiveRoutineRepositoryImpl implements ActiveRoutineRepository {
     public List<ActiveRoutine> findAllActiveOn(LocalDate date) {
         return jpaRepository.findAllActiveOn(date).stream().map(mapper::toDomain).toList();
     }
+
+    @Override
+    public List<ActiveRoutine> findAllByClientIds(List<ClientId> clientIds) {
+        return jpaRepository.findAllByClientIds(clientIds.stream().map(ClientId::value).toList()).stream()
+                .map(mapper::toDomain).toList();
+    }
 }

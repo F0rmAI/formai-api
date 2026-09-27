@@ -2,6 +2,7 @@ package com.formai.api.tracking.infrastructure.persistence.repositories;
 
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionId;
@@ -63,5 +64,10 @@ public class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     @Override
     public List<WorkoutSession> findAllPendingBefore(LocalDate date) {
         return jpaRepository.findAllPendingBefore(date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<LastWorkout> findLastWorkoutDates(List<ClientId> clientIds) {
+        return jpaRepository.findLastWorkoutDates(clientIds.stream().map(ClientId::value).toList());
     }
 }

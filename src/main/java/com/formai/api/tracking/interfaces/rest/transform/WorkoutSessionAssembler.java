@@ -6,8 +6,11 @@ import com.formai.api.tracking.domain.model.commands.FinishWorkoutSessionCommand
 import com.formai.api.tracking.domain.model.commands.RecordSetCommand;
 import com.formai.api.tracking.domain.model.entities.SessionExercise;
 import com.formai.api.tracking.domain.model.entities.SetEntry;
+import com.formai.api.tracking.domain.model.queries.GetClientOverviewsQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutHistoryQuery;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.ClientOverview;
+import com.formai.api.tracking.domain.model.valueobjects.ClientOverviewPage;
 import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.Load;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
@@ -15,6 +18,8 @@ import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
 import com.formai.api.tracking.domain.model.valueobjects.Reps;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionId;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionPage;
+import com.formai.api.tracking.interfaces.rest.resources.ClientOverviewPageResource;
+import com.formai.api.tracking.interfaces.rest.resources.ClientOverviewResource;
 import com.formai.api.tracking.interfaces.rest.resources.CreateSessionCompletionResource;
 import com.formai.api.tracking.interfaces.rest.resources.CreateSetCorrectionResource;
 import com.formai.api.tracking.interfaces.rest.resources.CreateSetResource;
@@ -49,6 +54,22 @@ public interface WorkoutSessionAssembler {
 
     @Mapping(target = "content", source = "items")
     WorkoutSessionPageResource toResource(WorkoutSessionPage page);
+
+    default ClientOverviewPageResource toResource(ClientOverviewPage page) {
+        return new ClientOverviewPageResource(page.items().stream().map(this::toResource).toList(),
+                page.page(), page.size(), page.totalElements(), page.totalPages());
+    }
+
+    default ClientOverviewResource toResource(ClientOverview overview) {
+        return new ClientOverviewResource(overview.clientId().value(), overview.fullName(), overview.status(),
+                overview.activeRoutineName().orElse(null), overview.lastWorkoutOn().orElse(null));
+    }
+
+    default GetClientOverviewsQuery toOverviewsQuery(String holderId, String search, String status, int page,
+                                                     int size) {
+        return new GetClientOverviewsQuery(holderId, Optional.ofNullable(search).filter(value -> !value.isBlank()),
+                Optional.ofNullable(status).filter(value -> !value.isBlank()), new Pagination(page, size));
+    }
 
     default RecordSetCommand toCommand(UUID workoutSessionId, String holderId, CreateSetResource resource) {
         return new RecordSetCommand(new WorkoutSessionId(workoutSessionId), toClientId(holderId),
