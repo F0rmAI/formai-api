@@ -19,7 +19,7 @@ through Open Host Services and domain events rather than over the network.
 - Trainer client management with body profiles and weight history
 - Exercise catalog, versioned routines and routine assignments
 - Workout logging with compliance status, history, progress reports and progress charts
-- Scheduled daily job that schedules today's sessions and skips overdue ones
+- Today's session scheduled on assignment, by a daily job and on startup; overdue ones skipped
 - Outbox of notifications (password reset email) delivered by a scheduled dispatcher
 - Spring Boot Framework
 - Spring Data JPA
@@ -145,6 +145,9 @@ includes the following features:
 - Show the client's current routine and today's session, with every session's detail.
 - Record load and reps per set, correct a set without duplicating it, and finish a session as
   `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED`.
+- Schedule today's session as soon as a routine starting today is assigned, then every day with
+  `WorkoutSessionDailyJob`, which also runs once on startup to catch up a cron missed while the
+  application was down.
 - Workout history, most recent first, with volume, per-set detail and a date filter, for the
   client and for the client's trainer.
 - Trainer client list with each client's current routine and last workout date.
@@ -248,15 +251,16 @@ are grouped by tag:
 
 | Tag | Operations |
 |---|---|
-| Authentication | sign-up, sign-in, sign-out |
-| Clients | client registration, activation codes, deactivation, body profile; account activation |
-| Exercises | the trainer's exercise catalog |
-| Routines | routines, versions, duplicates, assignments |
-| Workouts | active routine, today's session, sets, completion, history |
-| Client overviews | the trainer's client list with routine and last workout |
-| Progress reports | adherence and exercise metrics for a period |
-| Progress charts | load and volume evolution for 4, 8 or 12 weeks |
-| Password Recovery | request a reset link, reset the password |
+| Account access | sign-up, sign-in, sign-out, client account activation, password recovery |
+| Clients | trainer: client registration, activation codes, client list with routine and last workout, deactivation, body profile |
+| Exercises | trainer: the exercise catalog |
+| Routines | trainer: routines, versions, duplicates, assignments |
+| Workouts | client: active routine, today's session, sets, completion, history; trainer: a client's history |
+| Progress | trainer: a client's progress report and charts; client: own progress charts |
+
+Tag names and descriptions live in `shared/interfaces/rest/ApiTags`, and `OpenApiConfiguration`
+lists them in this order. Paths ending in `/me` are the client's (mobile app); paths under
+`/clients/{id}/…` are the trainer's view of one of their clients (web platform).
 
 Sign in with **Try it out** on `POST /api/v1/authentication/sign-in` (use
 `"application": "WEB_PLATFORM"` for a trainer). The browser stores the httpOnly JWT cookie
@@ -392,12 +396,12 @@ exists.
 
 | Method | Path | Swagger tag | Success | Errors | Auth |
 |---|---|---|---|---|---|
-| `POST` | `/api/v1/authentication/sign-up` | Authentication | `201` | `400` `409` `422` | No |
-| `POST` | `/api/v1/authentication/sign-in` | Authentication | `200` + JWT cookie | `400` `401` `403` `429` | No |
-| `POST` | `/api/v1/authentication/sign-out` | Authentication | `204` | — | No |
-| `POST` | `/api/v1/account-activations` | Clients | `201` | `400` `422` | No |
-| `POST` | `/api/v1/password-reset-requests` | Password Recovery | `201` | `400` | No |
-| `POST` | `/api/v1/password-resets` | Password Recovery | `201` | `400` `422` | No |
+| `POST` | `/api/v1/authentication/sign-up` | Account access | `201` | `400` `409` `422` | No |
+| `POST` | `/api/v1/authentication/sign-in` | Account access | `200` + JWT cookie | `400` `401` `403` `429` | No |
+| `POST` | `/api/v1/authentication/sign-out` | Account access | `204` | — | No |
+| `POST` | `/api/v1/account-activations` | Account access | `201` | `400` `422` | No |
+| `POST` | `/api/v1/password-reset-requests` | Account access | `201` | `400` | No |
+| `POST` | `/api/v1/password-resets` | Account access | `201` | `400` `422` | No |
 | `POST` | `/api/v1/clients` | Clients | `201` | `400` `403` `409` | Trainer |
 | `GET` | `/api/v1/clients?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}` | Clients | `200` | `403` `404` | Trainer |
@@ -408,8 +412,8 @@ exists.
 | `PUT` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/clients/{id}/assignments` | Routines | `200` | `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Trainer |
-| `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress reports | `200` | `400` `403` | Trainer |
-| `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress | `200` | `400` `403` | Trainer |
 | `POST` | `/api/v1/exercises` | Exercises | `201` | `400` `403` `409` | Trainer |
 | `GET` | `/api/v1/exercises?search&status&page&size` | Exercises | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/exercises/{id}` | Exercises | `200` | `403` `404` | Trainer |
@@ -424,14 +428,14 @@ exists.
 | `GET` | `/api/v1/routines/{id}/versions` | Routines | `200` | `403` `404` | Trainer |
 | `POST` | `/api/v1/routines/{id}/duplicates` | Routines | `201` | `400` `403` `404` | Trainer |
 | `POST` | `/api/v1/routines/{id}/assignments` | Routines | `201` | `400` `403` `404` `422` | Trainer |
-| `GET` | `/api/v1/client-overviews?search&status&page&size` | Client overviews | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/client-overviews?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/active-routines/me` | Workouts | `200` | `403` `404` | Client |
 | `GET` | `/api/v1/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Client |
 | `GET` | `/api/v1/workout-sessions/{id}` | Workouts | `200` | `403` `404` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/sets` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/corrections` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/completions` | Workouts | `201` | `403` `404` `409` | Client |
-| `GET` | `/api/v1/progress-charts/me?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Client |
+| `GET` | `/api/v1/progress-charts/me?exerciseId&weeks` | Progress | `200` | `400` `403` | Client |
 | `GET`  | `/actuator/health` | — | `200` | — | No |
 
 ## Error Handling
@@ -458,7 +462,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 370 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 375 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
