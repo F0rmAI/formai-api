@@ -3,11 +3,14 @@ package com.formai.api.planning.application;
 import com.formai.api.clients.domain.model.events.ClientDeactivated;
 import com.formai.api.clients.interfaces.acl.ClientsContextFacade;
 import com.formai.api.planning.application.acl.PlanningContextFacadeImpl;
+import com.formai.api.planning.application.internal.eventhandlers.AssignmentClosedEventHandler;
 import com.formai.api.planning.application.internal.eventhandlers.ClientDeactivatedEventHandler;
 import com.formai.api.planning.application.internal.eventhandlers.RoutineAssignedEventHandler;
 import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
+import com.formai.api.planning.domain.model.commands.CloseRoutineCommand;
 import com.formai.api.planning.domain.model.commands.MarkRoutineActiveCommand;
+import com.formai.api.planning.domain.model.events.AssignmentClosed;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
 import com.formai.api.planning.domain.model.valueobjects.ActiveAssignment;
@@ -31,8 +34,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// Everything that crosses planning's boundary: its Open Host Service, its ACL over clients
-// and the events it listens to.
 @ExtendWith(MockitoExtension.class)
 class PlanningIntegrationPointsTest {
 
@@ -106,5 +107,15 @@ class PlanningIntegrationPointsTest {
                 .on(new ClientDeactivated(CLIENT_ID.value(), TRAINER_HOLDER_ID));
 
         verify(clientPlanCommandService).handle(new CloseAssignmentCommand(CLIENT_ID, LocalDate.now()));
+    }
+
+    @Test
+    void shouldTryToCloseTheRoutineWhenAnAssignmentCloses() {
+        var routine = routine();
+
+        new AssignmentClosedEventHandler(routineCommandService)
+                .on(new AssignmentClosed(CLIENT_ID.value(), routine.getId().value(), START_DATE));
+
+        verify(routineCommandService).handle(new CloseRoutineCommand(routine.getId()));
     }
 }

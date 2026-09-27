@@ -20,6 +20,7 @@ import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.planning.PlanningTestData.prescription;
 import static com.formai.api.planning.PlanningTestData.routine;
+import static com.formai.api.planning.PlanningTestData.twoSessions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -124,5 +125,38 @@ class RoutineTest {
                 routine.getName(), List.of())))
                 .isInstanceOf(InvalidRoutineException.class);
         assertThat(routine.getVersions()).hasSize(1);
+    }
+
+    @Test
+    void shouldCloseAnActiveRoutineAndReopenItWhenAssignedAgain() {
+        var routine = routine();
+        routine.markActive();
+
+        routine.close();
+        assertThat(routine.getStatus()).isEqualTo(RoutineStatus.CLOSED);
+
+        routine.markActive();
+        assertThat(routine.getStatus()).isEqualTo(RoutineStatus.ACTIVE);
+    }
+
+    @Test
+    void shouldKeepADraftAsADraftWhenClosed() {
+        var routine = routine();
+
+        routine.close();
+
+        assertThat(routine.getStatus()).isEqualTo(RoutineStatus.DRAFT);
+    }
+
+    @Test
+    void shouldAcceptARevisionWhileClosed() {
+        var routine = routine();
+        routine.markActive();
+        routine.close();
+
+        routine.revise(new UpdateRoutineCommand(routine.getId(), TRAINER_HOLDER_ID, routine.getName(), twoSessions()));
+
+        assertThat(routine.currentVersion().getNumber()).isEqualTo(2);
+        assertThat(routine.getStatus()).isEqualTo(RoutineStatus.CLOSED);
     }
 }

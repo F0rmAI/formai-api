@@ -4,6 +4,7 @@ import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.model.aggregates.Routine;
+import com.formai.api.planning.domain.model.commands.CloseRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CreateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.DuplicateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.MarkRoutineActiveCommand;
@@ -13,6 +14,7 @@ import com.formai.api.planning.domain.model.entities.RoutineSession;
 import com.formai.api.planning.domain.model.events.RoutineUpdated;
 import com.formai.api.planning.domain.model.valueobjects.RoutineName;
 import com.formai.api.planning.domain.model.valueobjects.RoutineStatus;
+import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.domain.repositories.ExerciseRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
 import org.junit.jupiter.api.Test;
@@ -49,10 +51,12 @@ class RoutineCommandServiceImplTest {
     @Mock
     ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    ClientPlanRepository clientPlanRepository;
+
     @InjectMocks
     RoutineCommandServiceImpl commandService;
 
-    // As the assembler sends it: exercise names are unknown until read from the catalog.
     private static List<RoutineSession> legsDayWithoutNames() {
         return List.of(new RoutineSession(1, "Day A · Legs",
                 List.of(new PrescribedExercise(SQUAT_ID, null, prescription(3, 10, "60")))));
@@ -146,5 +150,29 @@ class RoutineCommandServiceImplTest {
 
         assertThat(routine.getStatus()).isEqualTo(RoutineStatus.ACTIVE);
         verify(routineRepository).save(routine);
+    }
+
+    @Test
+    void shouldCloseTheRoutineWhenNoClientHasItOpen() {
+        var routine = routine();
+        routine.markActive();
+        when(clientPlanRepository.existsOpenAssignmentByRoutineId(routine.getId())).thenReturn(false);
+        when(routineRepository.findById(routine.getId())).thenReturn(Optional.of(routine));
+
+        commandService.handle(new CloseRoutineCommand(routine.getId()));
+
+        assertThat(routine.getStatus()).isEqualTo(RoutineStatus.CLOSED);
+        verify(routineRepository).save(routine);
+    }
+
+    @Test
+    void shouldKeepTheRoutineActiveWhileAClientStillHasIt() {
+        var routine = routine();
+        when(clientPlanRepository.existsOpenAssignmentByRoutineId(routine.getId())).thenReturn(true);
+
+        commandService.handle(new CloseRoutineCommand(routine.getId()));
+
+        verify(routineRepository, never()).findById(any());
+        verify(routineRepository, never()).save(any());
     }
 }
