@@ -22,8 +22,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-// The aggregate nests each exercise's sets; the tables keep the prescribed exercises and
-// the recorded sets as two flat collections linked by exerciseId.
 @Mapper(componentModel = "spring")
 public interface WorkoutSessionJpaMapper {
 

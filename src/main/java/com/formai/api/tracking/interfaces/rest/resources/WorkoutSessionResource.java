@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// finishedAt is null until the session is finished.
 public record WorkoutSessionResource(UUID id,
                                      LocalDate scheduledFor,
                                      String dayLabel,

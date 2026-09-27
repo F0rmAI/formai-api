@@ -30,9 +30,6 @@ public class ActiveRoutineQueryServiceImpl implements ActiveRoutineQueryService 
         this.externalPlanningService = externalPlanningService;
     }
 
-    // A safe read: it never creates anything. When the local copy is missing (the sync
-    // event failed) it shows planning's routine without storing it. Either way a routine
-    // only shows from its start date (FR-010).
     @Override
     public Optional<TodayPlan> handle(GetActiveRoutineQuery query) {
         var routine = activeRoutineRepository.findByClientId(query.clientId())

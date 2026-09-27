@@ -38,6 +38,10 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
+// Composition controller: /clients/{id}/workout-sessions borrows the namespace of the clients module's
+// Client aggregate. It lives in tracking because tracking already depends on clients: serving this
+// route from clients would make clients depend on tracking and close a cycle. It holds no
+// business logic; the rules live in the tracking domain.
 @Tag(name = "Workouts", description = "The client's active routine, today's session, set recording, " +
         "session completion and workout history.")
 @RestController
@@ -64,7 +68,7 @@ public class WorkoutSessionsController {
                     content = @Content(schema = @Schema(implementation = WorkoutSessionPageResource.class))),
             @ApiResponse(responseCode = "400", description = "Only one of 'from'/'to', 'from' after 'to', " +
                     "or an invalid page or size", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content)
     })
     @GetMapping("/workout-sessions")
     public ResponseEntity<WorkoutSessionPageResource> getHistory(
@@ -83,7 +87,7 @@ public class WorkoutSessionsController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The session",
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such session for this client", content = @Content)
     })
     @GetMapping("/workout-sessions/{id}")
@@ -102,7 +106,7 @@ public class WorkoutSessionsController {
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing exercise, set number, load or reps",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such session for this client", content = @Content),
             @ApiResponse(responseCode = "409", description = "The session is already finished or skipped",
                     content = @Content),
@@ -124,7 +128,7 @@ public class WorkoutSessionsController {
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing exercise, set number, load or reps",
                     content = @Content),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such session for this client", content = @Content),
             @ApiResponse(responseCode = "409", description = "The session is already finished or skipped",
                     content = @Content),
@@ -145,7 +149,7 @@ public class WorkoutSessionsController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Session finished — returns it with its status",
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such session for this client", content = @Content),
             @ApiResponse(responseCode = "409", description = "Already finished or skipped, or some exercises " +
                     "have no sets and confirmPartial is false — ask the client to confirm", content = @Content)
@@ -158,7 +162,6 @@ public class WorkoutSessionsController {
         return created(workoutSessionCommandService.handle(command));
     }
 
-    // Served by tracking under the clients' path: clients never depends on tracking.
     @Operation(summary = "Get a client's workout history",
             description = "For trainers: the sessions recorded by one of their clients, most recent first, " +
                     "with the load and repetitions of every set. Optionally filtered by a date range.")

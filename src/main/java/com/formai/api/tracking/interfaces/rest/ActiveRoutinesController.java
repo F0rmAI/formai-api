@@ -43,7 +43,7 @@ public class ActiveRoutinesController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Active routine",
                     content = @Content(schema = @Schema(implementation = ActiveRoutineResource.class))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "The client has no routine assigned", content = @Content)
     })
     @GetMapping("/me")

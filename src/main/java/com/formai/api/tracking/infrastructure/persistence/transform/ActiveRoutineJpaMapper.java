@@ -56,7 +56,7 @@ public interface ActiveRoutineJpaMapper {
         try {
             return JSON.writeValueAsString(days);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not serialize the routine days", e);
+            throw new RoutineDaysStorageException("Could not serialize the routine days", e);
         }
     }
 
@@ -64,7 +64,7 @@ public interface ActiveRoutineJpaMapper {
         try {
             return JSON.readValue(daysJson, ROUTINE_DAYS);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Could not read the stored routine days", e);
+            throw new RoutineDaysStorageException("Could not read the stored routine days", e);
         }
     }
 }

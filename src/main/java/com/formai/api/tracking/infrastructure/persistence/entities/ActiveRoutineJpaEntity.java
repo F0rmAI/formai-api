@@ -33,8 +33,6 @@ public class ActiveRoutineJpaEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    // The routine days are a read-only copy of planning's snapshot, always read and replaced
-    // as a whole, so they are stored as a single JSON document.
     @Column(name = "days_json", nullable = false, columnDefinition = "text")
     private String daysJson;
 

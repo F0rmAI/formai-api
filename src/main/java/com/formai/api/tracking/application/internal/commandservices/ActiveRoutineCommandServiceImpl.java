@@ -22,9 +22,6 @@ public class ActiveRoutineCommandServiceImpl implements ActiveRoutineCommandServ
         this.externalPlanningService = externalPlanningService;
     }
 
-    // Planning is the source of truth: the routine is always re-read from its facade, so
-    // this is idempotent and also serves as the self-healing path when an event was missed.
-    // Empty when planning has no routine assigned to the client.
     @Override
     public Optional<ActiveRoutine> handle(SyncActiveRoutineCommand command) {
         return externalPlanningService.fetchActiveRoutine(command.clientId())
@@ -39,9 +36,6 @@ public class ActiveRoutineCommandServiceImpl implements ActiveRoutineCommandServ
                 });
     }
 
-    // Closing an assignment and assigning a new one publish separate events whose order is
-    // not guaranteed: if planning already reports a newer routine for the client, re-sync
-    // to it instead of ending the one the client now follows.
     @Override
     public void handle(EndActiveRoutineCommand command) {
         activeRoutineRepository.findByClientId(command.clientId()).ifPresent(routine -> {

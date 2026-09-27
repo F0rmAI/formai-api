@@ -21,8 +21,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// One routine day scheduled for a client on a given date, and what the client recorded
-// in it. Only a PENDING session accepts sets; finishing or skipping closes it.
 public class WorkoutSession {
 
     private WorkoutSessionId id;
@@ -64,8 +62,6 @@ public class WorkoutSession {
         exercise(command.exerciseId()).correct(command.setNumber(), command.load(), command.reps());
     }
 
-    // Everything recorded: COMPLETED. Exercises left without sets: PARTIAL, but only once
-    // the client confirms it, so a session is never closed as partial by accident.
     public ComplianceStatus finish(FinishWorkoutSessionCommand command) {
         ensurePending();
         if (isComplete()) {

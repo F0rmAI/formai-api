@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-// ACL over planning's Open Host Service: translates its published snapshot into
-// tracking's own PlannedRoutine, so planning's types never reach tracking's domain.
 @Service
 public class ExternalPlanningService {
 

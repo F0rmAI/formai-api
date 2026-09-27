@@ -10,8 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// AFTER_COMMIT: planning's transaction is already committed, so the sync runs in its own
-// transaction (REQUIRES_NEW) — otherwise its writes would never be committed.
 // Explicit bean name: planning has an event handler with the same simple name.
 @Component("trackingRoutineAssignedEventHandler")
 public class RoutineAssignedEventHandler {

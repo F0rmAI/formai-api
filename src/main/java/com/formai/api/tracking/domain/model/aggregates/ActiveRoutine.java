@@ -14,8 +14,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-// tracking's local copy of the routine a client is following, kept in sync with planning
-// through its events. One per client: a new assignment re-syncs it instead of adding one.
 public class ActiveRoutine {
 
     private ActiveRoutineId id;
@@ -39,8 +37,6 @@ public class ActiveRoutine {
         return routine;
     }
 
-    // Takes the plan's current state; sessions already scheduled keep the version they were
-    // scheduled with. Re-syncing also reopens a routine that had been ended.
     public void resync(PlannedRoutine plan) {
         this.routineId = plan.routineId();
         this.routineName = plan.routineName();
@@ -54,8 +50,6 @@ public class ActiveRoutine {
         this.endDate = command.endDate();
     }
 
-    // The day that follows, in routine order, the last one finished; after the last day it
-    // starts over from the first.
     public RoutineDay nextDay(Optional<Integer> lastOrder) {
         var ordered = days.stream().sorted(Comparator.comparingInt(RoutineDay::order)).toList();
         return lastOrder

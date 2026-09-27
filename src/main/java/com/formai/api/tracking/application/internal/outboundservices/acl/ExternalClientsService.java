@@ -10,8 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-// ACL over clients' Open Host Service. Explicit bean name: planning has its own
-// ExternalClientsService.
+// Explicit bean name: planning has its own ExternalClientsService.
 @Service("trackingExternalClientsService")
 public class ExternalClientsService {
 

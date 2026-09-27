@@ -37,8 +37,6 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
         this.eventPublisher = eventPublisher;
     }
 
-    // Idempotent: a client has at most one session per date, so re-running the daily job
-    // returns the session already scheduled instead of creating another one.
     @Override
     public Optional<WorkoutSession> handle(ScheduleWorkoutSessionCommand command) {
         var existing = workoutSessionRepository.findByClientIdAndScheduledFor(command.clientId(), command.date());
@@ -48,7 +46,6 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
         var routine = activeRoutineRepository.findByClientId(command.clientId())
                 .filter(candidate -> candidate.isActiveOn(command.date()))
                 .orElseThrow(ActiveRoutineNotFoundException::new);
-        // A session finished under a previous routine does not move the new routine forward.
         var lastOrder = workoutSessionRepository.findLastFinishedByClientId(command.clientId())
                 .filter(last -> last.getRoutineId().equals(routine.getRoutineId()))
                 .map(WorkoutSession::getDayOrder);
@@ -89,8 +86,6 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
         return Optional.of(saved);
     }
 
-    // Daily close: pending sessions from earlier days with nothing recorded become SKIPPED.
-    // Sessions with at least one set stay pending so the client can still finish them.
     @Override
     public void handle(SkipOverdueWorkoutSessionsCommand command) {
         workoutSessionRepository.findAllPendingBefore(command.date()).stream()
@@ -103,8 +98,6 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
                 });
     }
 
-    // Looked up by id AND owner, so another client's session answers exactly like a missing
-    // one (404) and its existence is never revealed.
     private WorkoutSession findOwnSession(WorkoutSessionId id, ClientId clientId) {
         return workoutSessionRepository.findByIdAndClientId(id, clientId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);

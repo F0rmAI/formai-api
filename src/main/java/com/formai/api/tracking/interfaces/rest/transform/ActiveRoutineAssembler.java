@@ -1,5 +1,6 @@
 package com.formai.api.tracking.interfaces.rest.transform;
 
+import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.ExerciseToPerform;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
@@ -10,7 +11,9 @@ import com.formai.api.tracking.interfaces.rest.resources.ExerciseToPerformResour
 import com.formai.api.tracking.interfaces.rest.resources.RoutineDayResource;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Mapper(componentModel = "spring")
@@ -21,15 +24,23 @@ public interface ActiveRoutineAssembler {
     @Mapping(target = "version", source = "routine.version")
     @Mapping(target = "startDate", source = "routine.startDate")
     @Mapping(target = "sessions", source = "routine.days")
-    @Mapping(target = "todaySessionOrder",
-            expression = "java(plan.todaySession().map(session -> session.getDayOrder()).orElse(null))")
-    @Mapping(target = "todayWorkoutSessionId",
-            expression = "java(plan.todaySession().map(session -> session.getId().value()).orElse(null))")
+    @Mapping(target = "todaySessionOrder", source = "todaySession", qualifiedByName = "todaySessionOrder")
+    @Mapping(target = "todayWorkoutSessionId", source = "todaySession", qualifiedByName = "todayWorkoutSessionId")
     ActiveRoutineResource toResource(TodayPlan plan);
 
     RoutineDayResource toResource(RoutineDay day);
 
     ExerciseToPerformResource toResource(ExerciseToPerform exercise);
+
+    @Named("todaySessionOrder")
+    default Integer todaySessionOrder(Optional<WorkoutSession> todaySession) {
+        return todaySession.map(WorkoutSession::getDayOrder).orElse(null);
+    }
+
+    @Named("todayWorkoutSessionId")
+    default UUID todayWorkoutSessionId(Optional<WorkoutSession> todaySession) {
+        return todaySession.map(session -> session.getId().value()).orElse(null);
+    }
 
     // required by MapStruct: single-field VOs need an explicit converter.
     default UUID map(RoutineId routineId) {

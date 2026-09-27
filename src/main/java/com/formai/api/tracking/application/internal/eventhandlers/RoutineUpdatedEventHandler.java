@@ -11,8 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// A new routine version re-syncs every client following that routine. Sessions already
-// scheduled keep the version they were scheduled with (FR-011).
 @Component
 public class RoutineUpdatedEventHandler {
 

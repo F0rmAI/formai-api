@@ -15,11 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
-// Once a day: closes the previous days (pending sessions with nothing recorded become
-// SKIPPED) and schedules today's session for every client with an active routine. It is
-// also the self-healing path for missed planning events: each routine is re-read from
-// planning first, so a new version is picked up and a closed assignment ends the routine
-// before anything new is scheduled.
 @Component
 public class WorkoutSessionDailyJob {
 
@@ -46,14 +41,12 @@ public class WorkoutSessionDailyJob {
         workoutSessionCommandService.handle(new SkipOverdueWorkoutSessionsCommand(today));
         for (var routine : activeRoutineQueryService.handle(new GetActiveRoutinesOnQuery(today))) {
             var clientId = routine.getClientId();
-            // One client's failure must not leave every other client without today's session.
             try {
                 var synced = activeRoutineCommandService.handle(new SyncActiveRoutineCommand(clientId));
                 if (synced.isEmpty()) {
                     activeRoutineCommandService.handle(new EndActiveRoutineCommand(clientId, today.minusDays(1)));
                     continue;
                 }
-                // A newly assigned routine may only start on a later date.
                 if (synced.get().isActiveOn(today)) {
                     workoutSessionCommandService.handle(new ScheduleWorkoutSessionCommand(clientId, today));
                 }
