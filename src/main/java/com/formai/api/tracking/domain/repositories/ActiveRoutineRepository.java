@@ -17,4 +17,6 @@ public interface ActiveRoutineRepository {
     List<ActiveRoutine> findAllByRoutineId(RoutineId routineId);
 
     List<ActiveRoutine> findAllActiveOn(LocalDate date);
+
+    List<ActiveRoutine> findAllByClientIds(List<ClientId> clientIds);
 }
