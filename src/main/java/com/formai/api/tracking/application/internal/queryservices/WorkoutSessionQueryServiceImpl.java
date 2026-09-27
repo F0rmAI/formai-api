@@ -4,17 +4,22 @@ import com.formai.api.tracking.application.internal.outboundservices.acl.Externa
 import com.formai.api.tracking.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.queries.GetClientOverviewsQuery;
+import com.formai.api.tracking.domain.model.queries.GetExerciseProgressQuery;
+import com.formai.api.tracking.domain.model.queries.GetProgressReportQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutHistoryQuery;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutSessionByIdQuery;
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.model.valueobjects.ClientOverview;
 import com.formai.api.tracking.domain.model.valueobjects.ClientOverviewPage;
+import com.formai.api.tracking.domain.model.valueobjects.ExerciseProgress;
+import com.formai.api.tracking.domain.model.valueobjects.ProgressReport;
 import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.TrainerClient;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionPage;
 import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import com.formai.api.tracking.domain.repositories.WorkoutSessionRepository;
+import com.formai.api.tracking.domain.services.ProgressCalculator;
 import com.formai.api.tracking.domain.services.WorkoutSessionQueryService;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +35,7 @@ public class WorkoutSessionQueryServiceImpl implements WorkoutSessionQueryServic
     private final WorkoutSessionRepository workoutSessionRepository;
     private final ActiveRoutineRepository activeRoutineRepository;
     private final ExternalClientsService externalClientsService;
+    private final ProgressCalculator progressCalculator = new ProgressCalculator();
 
     public WorkoutSessionQueryServiceImpl(WorkoutSessionRepository workoutSessionRepository,
                                           ActiveRoutineRepository activeRoutineRepository,
@@ -51,8 +57,22 @@ public class WorkoutSessionQueryServiceImpl implements WorkoutSessionQueryServic
         return workoutSessionRepository.findAllByClientId(query.clientId(), query.period(), query.pagination());
     }
 
-    // The trainer's client list (FR-006): clients gives the page of clients, already scoped
-    // to the trainer; tracking adds each one's current routine and last workout date.
+    @Override
+    public ProgressReport handle(GetProgressReportQuery query) {
+        ensureCanRead(query.clientId(), query.requesterHolderId());
+        var sessions = workoutSessionRepository.findAllByClientIdAndPeriod(query.clientId(), query.period());
+        return progressCalculator.report(query.clientId(), query.period(), sessions);
+    }
+
+    @Override
+    public ExerciseProgress handle(GetExerciseProgressQuery query) {
+        ensureCanRead(query.clientId(), query.requesterHolderId());
+        var since = LocalDate.now().minusWeeks(query.window().weeks());
+        var sessions = workoutSessionRepository.findAllByClientIdAndExerciseIdSince(query.clientId(),
+                query.exerciseId(), since);
+        return progressCalculator.evolution(query.exerciseId(), query.window(), sessions);
+    }
+
     @Override
     public ClientOverviewPage handle(GetClientOverviewsQuery query) {
         var clients = externalClientsService.fetchClientsOfTrainer(query.holderId(), query.search(), query.status(),
@@ -77,7 +97,6 @@ public class WorkoutSessionQueryServiceImpl implements WorkoutSessionQueryServic
                 clients.totalPages());
     }
 
-    // A client reads their own workouts; anyone else must be that client's trainer (IDOR).
     private void ensureCanRead(ClientId clientId, String requesterHolderId) {
         var isOwnHistory = clientId.value().toString().equals(requesterHolderId);
         if (!isOwnHistory && !externalClientsService.isClientOfTrainer(clientId, requesterHolderId)) {

@@ -2,6 +2,7 @@ package com.formai.api.tracking.infrastructure.persistence.repositories;
 
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
@@ -54,6 +55,19 @@ public class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
         var page = jpaRepository.findAllByClientId(clientId.value(), period, pageRequest);
         return new WorkoutSessionPage(page.getContent().stream().map(mapper::toDomain).toList(),
                 pagination.page(), pagination.size(), page.getTotalElements(), page.getTotalPages());
+    }
+
+    @Override
+    public List<WorkoutSession> findAllByClientIdAndPeriod(ClientId clientId, ReportPeriod period) {
+        return jpaRepository.findAllByClientIdAndPeriod(clientId.value(), period).stream()
+                .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<WorkoutSession> findAllByClientIdAndExerciseIdSince(ClientId clientId, ExerciseId exerciseId,
+                                                                    LocalDate since) {
+        return jpaRepository.findAllByClientIdAndExerciseIdSince(clientId.value(), exerciseId.value(), since).stream()
+                .map(mapper::toDomain).toList();
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.formai.api.tracking.domain.repositories;
 
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
@@ -20,13 +21,15 @@ public interface WorkoutSessionRepository {
 
     Optional<WorkoutSession> findByClientIdAndScheduledFor(ClientId clientId, LocalDate date);
 
-    // Most recent first (scheduledFor DESC).
     WorkoutSessionPage findAllByClientId(ClientId clientId, Optional<ReportPeriod> period, Pagination pagination);
+
+    List<WorkoutSession> findAllByClientIdAndPeriod(ClientId clientId, ReportPeriod period);
+
+    List<WorkoutSession> findAllByClientIdAndExerciseIdSince(ClientId clientId, ExerciseId exerciseId, LocalDate since);
 
     Optional<WorkoutSession> findLastFinishedByClientId(ClientId clientId);
 
     List<WorkoutSession> findAllPendingBefore(LocalDate date);
 
-    // Only for the clients that have trained at least once.
     List<LastWorkout> findLastWorkoutDates(List<ClientId> clientIds);
 }

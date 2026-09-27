@@ -27,6 +27,16 @@ public interface WorkoutSessionJpaRepository extends JpaRepository<WorkoutSessio
     Page<WorkoutSessionJpaEntity> findAllByClientIdAndScheduledForBetween(UUID clientId, LocalDate from,
                                                                           LocalDate to, Pageable pagination);
 
+    List<WorkoutSessionJpaEntity> findAllByClientIdAndScheduledForBetweenOrderByScheduledForAsc(UUID clientId,
+                                                                                              LocalDate from,
+                                                                                              LocalDate to);
+
+    @Query("select distinct s from WorkoutSessionJpaEntity s join s.sets e "
+            + "where s.clientId = :clientId and e.exerciseId = :exerciseId and s.scheduledFor >= :since")
+    List<WorkoutSessionJpaEntity> findAllByClientIdAndExerciseIdSince(@Param("clientId") UUID clientId,
+                                                                      @Param("exerciseId") UUID exerciseId,
+                                                                      @Param("since") LocalDate since);
+
     Optional<WorkoutSessionJpaEntity> findFirstByClientIdAndFinishedAtIsNotNullOrderByFinishedAtDesc(UUID clientId);
 
     List<WorkoutSessionJpaEntity> findAllByStatusAndScheduledForBefore(String status, LocalDate date);
@@ -42,6 +52,10 @@ public interface WorkoutSessionJpaRepository extends JpaRepository<WorkoutSessio
                 .orElseGet(() -> findAllByClientId(clientId, pagination));
     }
 
+    default List<WorkoutSessionJpaEntity> findAllByClientIdAndPeriod(UUID clientId, ReportPeriod period) {
+        return findAllByClientIdAndScheduledForBetweenOrderByScheduledForAsc(clientId, period.from(), period.to());
+    }
+
     default Optional<WorkoutSessionJpaEntity> findLastFinishedByClientId(UUID clientId) {
         return findFirstByClientIdAndFinishedAtIsNotNullOrderByFinishedAtDesc(clientId);
     }
@@ -50,7 +64,6 @@ public interface WorkoutSessionJpaRepository extends JpaRepository<WorkoutSessio
         return findAllByStatusAndScheduledForBefore("PENDING", date);
     }
 
-    // A client last trained on the date of their latest completed or partial session.
     default List<LastWorkout> findLastWorkoutDates(List<UUID> clientIds) {
         return findLastTrainedDates(clientIds).stream()
                 .map(row -> new LastWorkout(new ClientId((UUID) row[0]), (LocalDate) row[1]))

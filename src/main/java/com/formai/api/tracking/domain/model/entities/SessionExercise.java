@@ -7,14 +7,12 @@ import com.formai.api.tracking.domain.model.valueobjects.Load;
 import com.formai.api.tracking.domain.model.valueobjects.Reps;
 import com.formai.api.tracking.domain.model.valueobjects.TrainingVolume;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-// One prescribed exercise inside a WorkoutSession, with the sets the client actually did.
-// The prescription is copied when the session is scheduled, so later routine versions
-// never rewrite what was already planned or recorded (FR-011).
 public class SessionExercise {
 
     private final ExerciseId exerciseId;
@@ -32,8 +30,6 @@ public class SessionExercise {
         return new SessionExercise(toPerform, List.of());
     }
 
-    // Recording a set that was already recorded replaces it, so a retried request never
-    // duplicates a set.
     public void record(int setNumber, Load load, Reps reps, Instant at) {
         ensurePrescribed(setNumber);
         sets.removeIf(set -> set.getSetNumber() == setNumber);
@@ -41,7 +37,6 @@ public class SessionExercise {
         sets.sort(Comparator.comparingInt(SetEntry::getSetNumber));
     }
 
-    // A correction replaces the set in place and keeps its original recording time.
     public void correct(int setNumber, Load load, Reps reps) {
         ensurePrescribed(setNumber);
         var index = indexOf(setNumber);
@@ -60,6 +55,13 @@ public class SessionExercise {
         return sets.stream()
                 .map(SetEntry::volume)
                 .reduce(TrainingVolume.ZERO, TrainingVolume::plus);
+    }
+
+    public Load maxLoad() {
+        return sets.stream()
+                .map(SetEntry::getLoad)
+                .max(Comparator.comparing(Load::kilograms))
+                .orElse(new Load(BigDecimal.ZERO));
     }
 
     private void ensurePrescribed(int setNumber) {
