@@ -11,6 +11,7 @@ import com.formai.api.planning.domain.services.ClientPlanQueryService;
 import com.formai.api.planning.domain.services.RoutineQueryService;
 import com.formai.api.planning.interfaces.rest.resources.AssignmentResource;
 import com.formai.api.planning.interfaces.rest.transform.ClientPlanAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -34,8 +35,7 @@ import java.util.UUID;
 // Client aggregate. It lives in planning because planning already depends on clients: serving this
 // route from clients would make clients depend on planning and close a cycle. It holds no
 // business logic; the rules live in the planning domain.
-@Tag(name = "Routines", description = "Routines with sessions and prescribed exercises, their version history, " +
-        "and their assignment to clients.")
+@Tag(name = ApiTags.ROUTINES, description = ApiTags.ROUTINES_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/clients/{id}/assignments")
 public class AssignmentsController {

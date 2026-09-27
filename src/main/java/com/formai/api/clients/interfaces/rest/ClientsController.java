@@ -17,6 +17,7 @@ import com.formai.api.clients.interfaces.rest.resources.RegisteredClientResource
 import com.formai.api.clients.interfaces.rest.resources.UpdateBodyProfileResource;
 import com.formai.api.clients.interfaces.rest.resources.UpdateClientResource;
 import com.formai.api.clients.interfaces.rest.transform.ClientAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -42,7 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Optional;
 import java.util.UUID;
 
-@Tag(name = "Clients", description = "The trainer's clients: registration, activation codes, deactivation and body profile.")
+@Tag(name = ApiTags.CLIENTS, description = ApiTags.CLIENTS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/clients")
 public class ClientsController {

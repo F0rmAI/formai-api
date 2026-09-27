@@ -1,5 +1,6 @@
 package com.formai.api.tracking.interfaces.rest;
 
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import com.formai.api.tracking.domain.exceptions.WorkoutSessionNotFoundException;
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.queries.GetWorkoutSessionByIdQuery;
@@ -42,8 +43,7 @@ import java.util.UUID;
 // Client aggregate. It lives in tracking because tracking already depends on clients: serving this
 // route from clients would make clients depend on tracking and close a cycle. It holds no
 // business logic; the rules live in the tracking domain.
-@Tag(name = "Workouts", description = "The client's active routine, today's session, set recording, " +
-        "session completion and workout history.")
+@Tag(name = ApiTags.WORKOUTS, description = ApiTags.WORKOUTS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1")
 public class WorkoutSessionsController {

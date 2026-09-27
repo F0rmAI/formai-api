@@ -1,5 +1,6 @@
 package com.formai.api.tracking.interfaces.rest;
 
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import com.formai.api.tracking.domain.services.WorkoutSessionQueryService;
 import com.formai.api.tracking.interfaces.rest.resources.ClientOverviewPageResource;
 import com.formai.api.tracking.interfaces.rest.transform.WorkoutSessionAssembler;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Client overviews", description = "The trainer's client list with each client's routine and last workout.")
+@Tag(name = ApiTags.CLIENTS, description = ApiTags.CLIENTS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/client-overviews")
 public class ClientOverviewsController {

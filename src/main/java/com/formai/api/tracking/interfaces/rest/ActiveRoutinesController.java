@@ -1,5 +1,6 @@
 package com.formai.api.tracking.interfaces.rest;
 
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import com.formai.api.tracking.domain.exceptions.ActiveRoutineNotFoundException;
 import com.formai.api.tracking.domain.model.queries.GetActiveRoutineQuery;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
@@ -21,8 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Tag(name = "Workouts", description = "The client's active routine, today's session, set recording, " +
-        "session completion and workout history.")
+@Tag(name = ApiTags.WORKOUTS, description = ApiTags.WORKOUTS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/active-routines")
 public class ActiveRoutinesController {

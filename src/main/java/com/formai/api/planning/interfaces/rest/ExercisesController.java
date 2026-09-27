@@ -14,6 +14,7 @@ import com.formai.api.planning.interfaces.rest.resources.ExercisePageResource;
 import com.formai.api.planning.interfaces.rest.resources.ExerciseResource;
 import com.formai.api.planning.interfaces.rest.resources.UpdateMachineLinkResource;
 import com.formai.api.planning.interfaces.rest.transform.ExerciseAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -40,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 import java.util.UUID;
 
-@Tag(name = "Exercises", description = "The trainer's own catalog of reusable exercises.")
+@Tag(name = ApiTags.EXERCISES, description = ApiTags.EXERCISES_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/exercises")
 public class ExercisesController {
