@@ -1,5 +1,6 @@
 package com.formai.api.tracking.interfaces.rest;
 
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.services.WorkoutSessionQueryService;
 import com.formai.api.tracking.interfaces.rest.resources.ProgressReportResource;
@@ -25,7 +26,7 @@ import java.util.UUID;
 // Client aggregate. It lives in tracking because tracking already depends on clients: serving this
 // route from clients would make clients depend on tracking and close a cycle. It holds no
 // business logic; the rules live in the tracking domain (ProgressCalculator).
-@Tag(name = "Progress reports", description = "A client's adherence and exercise progress over a period.")
+@Tag(name = ApiTags.PROGRESS, description = ApiTags.PROGRESS_DESCRIPTION)
 @RestController
 public class ProgressReportsController {
 

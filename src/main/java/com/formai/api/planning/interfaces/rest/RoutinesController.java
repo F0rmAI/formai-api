@@ -20,6 +20,7 @@ import com.formai.api.planning.interfaces.rest.resources.RoutineVersionResource;
 import com.formai.api.planning.interfaces.rest.resources.UpdateRoutineResource;
 import com.formai.api.planning.interfaces.rest.transform.ClientPlanAssembler;
 import com.formai.api.planning.interfaces.rest.transform.RoutineAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -46,8 +47,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Tag(name = "Routines", description = "Routines with sessions and prescribed exercises, their version history, " +
-        "and their assignment to clients.")
+@Tag(name = ApiTags.ROUTINES, description = ApiTags.ROUTINES_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/routines")
 public class RoutinesController {

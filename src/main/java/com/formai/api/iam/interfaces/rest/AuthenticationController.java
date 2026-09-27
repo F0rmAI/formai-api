@@ -9,6 +9,7 @@ import com.formai.api.iam.interfaces.rest.resources.SignUpResource;
 import com.formai.api.iam.interfaces.rest.resources.UserResource;
 import com.formai.api.iam.interfaces.rest.transform.UserAssembler;
 import com.formai.api.shared.config.JwtCookieFactory;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,8 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 // @SecurityRequirements to override the global cookieAuth requirement declared in
 // OpenApiConfiguration — otherwise Swagger UI would wrongly show these as needing the
 // JWT cookie that they're the ones issuing in the first place.
-@Tag(name = "Authentication", description = "Sign-up, sign-in and sign-out. The issued JWT " +
-        "travels only in an httpOnly cookie (see JwtCookieFactory), never in the response body.")
+@Tag(name = ApiTags.ACCOUNT_ACCESS, description = ApiTags.ACCOUNT_ACCESS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/authentication")
 public class AuthenticationController {

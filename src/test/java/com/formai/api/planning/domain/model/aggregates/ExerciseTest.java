@@ -1,13 +1,17 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
+import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
+import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.UUID;
 
+import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.planning.PlanningTestData.squat;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,5 +50,20 @@ class ExerciseTest {
         exercise.restore();
         exercise.restore();
         assertThat(exercise.getStatus()).isEqualTo(ExerciseStatus.ACTIVE);
+    }
+
+    @Test
+    void shouldStartWithoutAMachine() {
+        assertThat(squat().getMachineId()).isNull();
+    }
+
+    @Test
+    void shouldLinkToAMachine() {
+        var exercise = squat();
+        var machineId = new MachineId(UUID.randomUUID());
+
+        exercise.linkToMachine(new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID, machineId));
+
+        assertThat(exercise.getMachineId()).isEqualTo(machineId);
     }
 }

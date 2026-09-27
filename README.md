@@ -19,7 +19,8 @@ through Open Host Services and domain events rather than over the network.
 - Trainer client management with body profiles and weight history
 - Exercise catalog, versioned routines and routine assignments
 - Workout logging with compliance status, history, progress reports and progress charts
-- Scheduled daily job that schedules today's sessions and skips overdue ones
+- Today's session scheduled on assignment, by a daily job and on startup; overdue ones skipped
+- Outbox of notifications (password reset email) delivered by a scheduled dispatcher
 - Spring Boot Framework
 - Spring Data JPA
 - Bean Validation
@@ -115,6 +116,10 @@ includes the following features:
 
 - Keep an exercise catalog per trainer; an exercise used by a routine can only be archived,
   and an archived exercise can be restored.
+- Link an exercise to a published machine of the catalog, so its usage guide goes with the
+  exercise in the clients' routines. The machine catalog belongs to the final increment and
+  does not exist yet: `ExternalCatalogService` answers that no machine is published, so every
+  link answers `422` until that context is built.
 - Create routines with sessions and prescribed exercises (sets, reps, target load, rest),
   starting as `DRAFT`, and duplicate them.
 - Revise a routine: every change adds a version with its date and author.
@@ -140,6 +145,9 @@ includes the following features:
 - Show the client's current routine and today's session, with every session's detail.
 - Record load and reps per set, correct a set without duplicating it, and finish a session as
   `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED`.
+- Schedule today's session as soon as a routine starting today is assigned, then every day with
+  `WorkoutSessionDailyJob`, which also runs once on startup to catch up a cron missed while the
+  application was down.
 - Workout history, most recent first, with volume, per-set detail and a date filter, for the
   client and for the client's trainer.
 - Trainer client list with each client's current routine and last workout date.
@@ -151,6 +159,26 @@ It relies on an anti-corruption layer (ACL) to consume the Planning and Clients 
 translating their contracts into this context's own model. It reacts to the `RoutineAssigned`,
 `RoutineUpdated` and `AssignmentClosed` domain events published by the Planning Context to keep
 the client's current routine in sync, keeping both contexts decoupled.
+
+### Notifications Context
+
+The Notifications Context delivers the messages other contexts ask for. Today it sends the
+password reset email (the only transactional email of the product):
+
+- `PasswordResetRequestedEventHandler` reacts, after commit, to the `PasswordResetRequested`
+  event published by IAM and schedules a `Notification` with the reset link
+  (`PASSWORD_RESET_URL` + token). A newer request cancels the email still waiting for the
+  previous link, since IAM keeps only the latest token.
+- `PendingNotificationDispatcherJob` sends the due notifications every minute
+  (`NOTIFICATIONS_DISPATCHER_DELAY`) and retries the failed ones.
+- Resilience is outbox + reconciliation: the `Notification` row is the outbox. If the handler
+  fails after IAM's commit no email goes out; the reset request still answers the same neutral
+  message and the user can ask for a new link.
+- The email provider is still to be decided. `SmtpEmailDeliveryService` only logs that an
+  email is due (never the address or the body, which carries the token); replacing it with a
+  real provider is the only change needed.
+
+It has no REST endpoints and depends on no other context's facade.
 
 ## Technology Stack
 
@@ -180,12 +208,14 @@ com.formai.api
 ├── clients/              Clients (supporting subdomain) — trainers, clients, body profiles
 ├── planning/             Planning (core subdomain) — exercises, routines, assignments
 ├── tracking/             Tracking (core subdomain) — active routines, workout sessions, progress
+├── notifications/        Notifications (generic subdomain) — notification outbox and dispatcher
 └── shared/               Cross-cutting: security, JWT cookie, CORS, Flyway per module,
                           OpenAPI, global exception handler, inter-module contracts
 ```
 
 Dependencies only point one way: `clients` consumes `iam`, `planning` consumes `clients`, and
-`tracking` consumes `planning` and `clients`, always through an OHS facade or a domain event.
+`tracking` consumes `planning` and `clients`, and `notifications` reacts to an `iam` event,
+always through an OHS facade or a domain event.
 
 ## Getting Started
 
@@ -200,6 +230,9 @@ Dependencies only point one way: `clients` consumes `iam`, `planning` consumes `
 ```bash
 cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64)
 ```
+
+`PASSWORD_RESET_URL` (the front-end page that receives the reset token) and
+`NOTIFICATIONS_DISPATCHER_DELAY` are optional; `.env.example` shows their defaults.
 
 ### Running the application
 
@@ -218,15 +251,16 @@ are grouped by tag:
 
 | Tag | Operations |
 |---|---|
-| Authentication | sign-up, sign-in, sign-out |
-| Clients | client registration, activation codes, deactivation, body profile; account activation |
-| Exercises | the trainer's exercise catalog |
-| Routines | routines, versions, duplicates, assignments |
-| Workouts | active routine, today's session, sets, completion, history |
-| Client overviews | the trainer's client list with routine and last workout |
-| Progress reports | adherence and exercise metrics for a period |
-| Progress charts | load and volume evolution for 4, 8 or 12 weeks |
-| Password Recovery | request a reset link, reset the password |
+| Account access | sign-up, sign-in, sign-out, client account activation, password recovery |
+| Clients | trainer: client registration, activation codes, client list with routine and last workout, deactivation, body profile |
+| Exercises | trainer: the exercise catalog |
+| Routines | trainer: routines, versions, duplicates, assignments |
+| Workouts | client: active routine, today's session, sets, completion, history; trainer: a client's history |
+| Progress | trainer: a client's progress report and charts; client: own progress charts |
+
+Tag names and descriptions live in `shared/interfaces/rest/ApiTags`, and `OpenApiConfiguration`
+lists them in this order. Paths ending in `/me` are the client's (mobile app); paths under
+`/clients/{id}/…` are the trainer's view of one of their clients (web platform).
 
 Sign in with **Try it out** on `POST /api/v1/authentication/sign-in` (use
 `"application": "WEB_PLATFORM"` for a trainer). The browser stores the httpOnly JWT cookie
@@ -326,16 +360,48 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 - **A10 (Authentication Attacks):** stateless, short-lived JWT, and account lockout for 15
   minutes after 5 consecutive failed sign-ins. MFA is out of scope for now.
 
+## User Stories Coverage
+
+User stories of the requirements specification (`FormAI_Requirements_Specification.md`) that are
+ready to use. New development starts from this table.
+
+| US | User story | Endpoint | What it does |
+|---|---|---|---|
+| US-001 | As a personal trainer, sign up with my email and password | `POST /api/v1/authentication/sign-up` | Creates an active trainer account with a BCrypt-hashed password; a taken email answers `409` |
+| US-002 | As a trainer or client, sign in and sign out securely | `POST /api/v1/authentication/sign-in` · `POST /api/v1/authentication/sign-out` | Issues the JWT in an httpOnly cookie per channel (trainers on the web, clients on the app), locks the account after 5 failures, and clears the cookie on sign-out |
+| US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with a 72-hour activation code and renews it, invalidating the previous one |
+| US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/account-activations` | Activates the account with a valid code, a password and the data processing consent |
+| US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history |
+| US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
+| US-008 | As a trainer, create routines with sessions, exercises, sets, reps and loads | `POST /api/v1/routines` · `GET /api/v1/routines?page&size` · `GET /api/v1/routines/{id}` · `POST /api/v1/routines/{id}/duplicates` | Creates routines as `DRAFT`, rejects invalid prescriptions and duplicates a routine without its clients |
+| US-009 | As a trainer, keep my own exercise catalog | `POST /api/v1/exercises` · `GET /api/v1/exercises?search&status&page&size` · `GET /api/v1/exercises/{id}` · `DELETE /api/v1/exercises/{id}` · `POST /api/v1/exercises/{id}/archivals` | Creates exercises without duplicate names, and only archives an exercise a routine uses |
+| US-010 | As a trainer, assign a routine to one or several clients | `POST /api/v1/routines/{id}/assignments` · `GET /api/v1/clients/{id}/assignments` | Assigns the routine to active clients from a start date, closing their previous assignment |
+| US-011 | As a trainer, modify the routine assigned to a client | `PUT /api/v1/routines/{id}` · `GET /api/v1/routines/{id}/versions` | Saves every change as a new version with its date and author, leaving past workouts untouched |
+| US-012 | As a client, see my current routine and pick today's session or any other | `GET /api/v1/active-routines/me` | Shows today's session and every session of the current routine, or `404` when none is assigned |
+| US-013 | As a client, record the load and reps of each set | `POST /api/v1/workout-sessions/{id}/sets` · `POST /api/v1/workout-sessions/{id}/corrections` | Records each set with its date and time, rejects invalid values and corrects a set without duplicating it |
+| US-014 | As a client, finish my session and see its compliance status | `POST /api/v1/workout-sessions/{id}/completions` | Finishes the session as `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED` |
+| US-015 | As a client, check my workout history | `GET /api/v1/workout-sessions?from&to&page&size` · `GET /api/v1/workout-sessions/{id}` | Lists my sessions newest first with status and volume, filters by dates and shows each set |
+| US-016 | As a trainer, review the workouts each client recorded | `GET /api/v1/clients/{id}/workout-sessions?from&to&page&size` | Shows a client's sessions with status and per-set detail; another trainer's client answers `403` |
+| US-017 | As a trainer, see each client's adherence and basic metrics | `GET /api/v1/clients/{id}/progress-reports?from&to` | Returns adherence, sessions by status, and each exercise's heaviest load and volume in its first and last session; 0 % when there is no data |
+| US-018 | As a trainer or client, see load and volume progress charts | `GET /api/v1/progress-charts/me?exerciseId&weeks` · `GET /api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Returns heaviest load and volume per date over 4, 8 or 12 weeks, flagging when there is not enough data |
+| US-033 | As a trainer, restore an archived exercise of my catalog | `POST /api/v1/exercises/{id}/restorations` | Makes the exercise available again for new routines |
+| US-034 | As a trainer, assign a closed routine again, adjusting it if needed | `POST /api/v1/routines/{id}/assignments` · `PUT /api/v1/routines/{id}` | A routine with no open assignment becomes `CLOSED`; assigning it again reopens it without duplicating it, and editing it first adds a version |
+
+Partially delivered: **US-005** (password reset by email) works end to end, but the email is
+only logged until the email provider is decided; **US-030** (link exercises to published
+machines, `PUT /api/v1/exercises/{id}/machine-link`) answers `422` until the machine catalog
+exists.
+
 ## API Endpoints
 
 | Method | Path | Swagger tag | Success | Errors | Auth |
 |---|---|---|---|---|---|
-| `POST` | `/api/v1/authentication/sign-up` | Authentication | `201` | `400` `409` `422` | No |
-| `POST` | `/api/v1/authentication/sign-in` | Authentication | `200` + JWT cookie | `400` `401` `403` `429` | No |
-| `POST` | `/api/v1/authentication/sign-out` | Authentication | `204` | — | No |
-| `POST` | `/api/v1/account-activations` | Clients | `201` | `400` `422` | No |
-| `POST` | `/api/v1/password-reset-requests` | Password Recovery | `201` | `400` | No |
-| `POST` | `/api/v1/password-resets` | Password Recovery | `201` | `400` `422` | No |
+| `POST` | `/api/v1/authentication/sign-up` | Account access | `201` | `400` `409` `422` | No |
+| `POST` | `/api/v1/authentication/sign-in` | Account access | `200` + JWT cookie | `400` `401` `403` `429` | No |
+| `POST` | `/api/v1/authentication/sign-out` | Account access | `204` | — | No |
+| `POST` | `/api/v1/account-activations` | Account access | `201` | `400` `422` | No |
+| `POST` | `/api/v1/password-reset-requests` | Account access | `201` | `400` | No |
+| `POST` | `/api/v1/password-resets` | Account access | `201` | `400` `422` | No |
 | `POST` | `/api/v1/clients` | Clients | `201` | `400` `403` `409` | Trainer |
 | `GET` | `/api/v1/clients?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}` | Clients | `200` | `403` `404` | Trainer |
@@ -346,14 +412,15 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 | `PUT` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/clients/{id}/assignments` | Routines | `200` | `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Trainer |
-| `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress reports | `200` | `400` `403` | Trainer |
-| `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress | `200` | `400` `403` | Trainer |
 | `POST` | `/api/v1/exercises` | Exercises | `201` | `400` `403` `409` | Trainer |
 | `GET` | `/api/v1/exercises?search&status&page&size` | Exercises | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/exercises/{id}` | Exercises | `200` | `403` `404` | Trainer |
 | `DELETE` | `/api/v1/exercises/{id}` | Exercises | `204` | `403` `404` `409` | Trainer |
 | `POST` | `/api/v1/exercises/{id}/archivals` | Exercises | `201` | `403` `404` | Trainer |
 | `POST` | `/api/v1/exercises/{id}/restorations` | Exercises | `201` | `403` `404` | Trainer |
+| `PUT` | `/api/v1/exercises/{id}/machine-link` | Exercises | `200` | `400` `403` `404` `422` | Trainer |
 | `POST` | `/api/v1/routines` | Routines | `201` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/routines?page&size` | Routines | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/routines/{id}` | Routines | `200` | `403` `404` | Trainer |
@@ -361,14 +428,14 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 | `GET` | `/api/v1/routines/{id}/versions` | Routines | `200` | `403` `404` | Trainer |
 | `POST` | `/api/v1/routines/{id}/duplicates` | Routines | `201` | `400` `403` `404` | Trainer |
 | `POST` | `/api/v1/routines/{id}/assignments` | Routines | `201` | `400` `403` `404` `422` | Trainer |
-| `GET` | `/api/v1/client-overviews?search&status&page&size` | Client overviews | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/client-overviews?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/active-routines/me` | Workouts | `200` | `403` `404` | Client |
 | `GET` | `/api/v1/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Client |
 | `GET` | `/api/v1/workout-sessions/{id}` | Workouts | `200` | `403` `404` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/sets` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/corrections` | Workouts | `201` | `400` `403` `404` `409` `422` | Client |
 | `POST` | `/api/v1/workout-sessions/{id}/completions` | Workouts | `201` | `403` `404` `409` | Client |
-| `GET` | `/api/v1/progress-charts/me?exerciseId&weeks` | Progress charts | `200` | `400` `403` | Client |
+| `GET` | `/api/v1/progress-charts/me?exerciseId&weeks` | Progress | `200` | `400` `403` | Client |
 | `GET`  | `/actuator/health` | — | `200` | — | No |
 
 ## Error Handling
@@ -395,8 +462,8 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 340 tests across every layer of `iam`, `clients`, `planning` and `tracking`, plus
-the ArchUnit boundary rules.
+The suite has 375 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+`notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
 every push and pull request to `main`, `develop`, and `release/**` — see

@@ -3,6 +3,7 @@ package com.formai.api.planning.interfaces.rest;
 import com.formai.api.planning.domain.exceptions.ExerciseAlreadyExistsException;
 import com.formai.api.planning.domain.exceptions.ExerciseInUseException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.MachineNotPublishedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -27,5 +28,10 @@ public class ExercisesControllerAdvice {
     @ExceptionHandler(ExerciseInUseException.class)
     public ProblemDetail handleExerciseInUse(ExerciseInUseException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(MachineNotPublishedException.class)
+    public ProblemDetail handleMachineNotPublished(MachineNotPublishedException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 }

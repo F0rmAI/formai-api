@@ -53,4 +53,15 @@ public class FlywayConfig {
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
     }
+
+    @Bean
+    public FlywayMigrationInitializer notificationsFlywayMigrationInitializer(DataSource dataSource) {
+        var flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .schemas("notifications")
+                .table("flyway_notifications_notifications")
+                .locations("classpath:db/migration/notifications")
+                .load();
+        return new FlywayMigrationInitializer(flyway, null);
+    }
 }

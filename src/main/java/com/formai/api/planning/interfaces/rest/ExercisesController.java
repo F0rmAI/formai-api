@@ -12,7 +12,9 @@ import com.formai.api.planning.domain.services.ExerciseQueryService;
 import com.formai.api.planning.interfaces.rest.resources.CreateExerciseResource;
 import com.formai.api.planning.interfaces.rest.resources.ExercisePageResource;
 import com.formai.api.planning.interfaces.rest.resources.ExerciseResource;
+import com.formai.api.planning.interfaces.rest.resources.UpdateMachineLinkResource;
 import com.formai.api.planning.interfaces.rest.transform.ExerciseAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,12 +25,14 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Optional;
 import java.util.UUID;
 
-@Tag(name = "Exercises", description = "The trainer's own catalog of reusable exercises.")
+@Tag(name = ApiTags.EXERCISES, description = ApiTags.EXERCISES_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/exercises")
 public class ExercisesController {
@@ -146,6 +150,27 @@ public class ExercisesController {
     public ResponseEntity<ExerciseResource> restore(@PathVariable UUID id, Authentication authentication) {
         return created(exerciseCommandService.handle(
                 new RestoreExerciseCommand(new ExerciseId(id), authentication.getName())));
+    }
+
+    @Operation(summary = "Link an exercise to a machine",
+            description = "Links an exercise of my catalog to a published machine, so its usage guide goes with the "
+                    + "exercise in my clients' routines. No machine is published until the machine catalog exists.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Exercise linked to the machine",
+                    content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
+            @ApiResponse(responseCode = "400", description = "Missing machine id", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No such exercise in the catalog", content = @Content),
+            @ApiResponse(responseCode = "422", description = "The machine is not published",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @PutMapping("/{id}/machine-link")
+    public ResponseEntity<ExerciseResource> linkMachine(@PathVariable UUID id,
+                                                        @Valid @RequestBody UpdateMachineLinkResource resource,
+                                                        Authentication authentication) {
+        var exercise = exerciseCommandService.handle(assembler.toCommand(id, authentication.getName(), resource))
+                .orElseThrow(() -> new IllegalStateException("An exercise command should never return empty"));
+        return ResponseEntity.ok(assembler.toResource(exercise));
     }
 
     private ResponseEntity<ExerciseResource> created(Optional<Exercise> exercise) {

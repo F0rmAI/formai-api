@@ -4,6 +4,7 @@ import com.formai.api.iam.domain.services.UserCommandService;
 import com.formai.api.iam.interfaces.rest.resources.CreatePasswordResetResource;
 import com.formai.api.iam.interfaces.rest.resources.PasswordResetResource;
 import com.formai.api.iam.interfaces.rest.transform.UserAssembler;
+import com.formai.api.shared.interfaces.rest.ApiTags;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,8 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Password Recovery", description = "Recover account access: request a one-time reset link " +
-        "by email, then set a new password with its token.")
+@Tag(name = ApiTags.ACCOUNT_ACCESS, description = ApiTags.ACCOUNT_ACCESS_DESCRIPTION)
 @RestController
 @RequestMapping("/api/v1/password-resets")
 public class PasswordResetsController {
