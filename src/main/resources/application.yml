@@ -34,9 +34,15 @@ tracking:
     workout-session-daily:
       cron: ${TRACKING_DAILY_JOB_CRON:0 5 0 * * *}   # every day at 00:05 (server time zone)
 
+notifications:
+  password-reset-url: ${PASSWORD_RESET_URL:http://localhost:5173/password-reset?token=}   # the token is appended
+  jobs:
+    dispatcher:
+      delay: ${NOTIFICATIONS_DISPATCHER_DELAY:PT1M}   # how often due notifications are sent
+
 documentation:
   application:
-    description: 'FormAI API — modular monolith (Bounded Contexts: iam, clients, planning, tracking)'
+    description: 'FormAI API — modular monolith (Bounded Contexts: iam, clients, planning, tracking, notifications)'
     version: '@project.version@'
 
 management:
