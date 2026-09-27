@@ -26,7 +26,7 @@ public class FlywayConfig {
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas("clients")
-                .table("flyway_clients")
+                .table("flyway_clients_clients")
                 .locations("classpath:db/migration/clients")
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
@@ -37,7 +37,7 @@ public class FlywayConfig {
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas("planning")
-                .table("flyway_planning")
+                .table("flyway_planning_routines")
                 .locations("classpath:db/migration/planning")
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
@@ -48,7 +48,7 @@ public class FlywayConfig {
         var flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .schemas("tracking")
-                .table("flyway_tracking")
+                .table("flyway_tracking_workout_sessions")
                 .locations("classpath:db/migration/tracking")
                 .load();
         return new FlywayMigrationInitializer(flyway, null);
