@@ -97,7 +97,7 @@ Lombok, Flyway, and the PostgreSQL driver are managed by the `spring-boot-starte
 ## Project Structure
 
 ```
-com.formai
+com.formai.api
 ├── iam/                  Identity and Access Management (generic subdomain)
 │   ├── domain/           User aggregate, ActivationCode and PasswordResetToken entities,
 │   │                     value objects, commands, queries, events, exceptions
