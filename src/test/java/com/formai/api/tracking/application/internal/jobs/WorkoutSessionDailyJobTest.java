@@ -27,8 +27,10 @@ import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
 import static com.formai.api.tracking.TrackingTestData.ROUTINE_ID;
 import static com.formai.api.tracking.TrackingTestData.TODAY;
 import static com.formai.api.tracking.TrackingTestData.activeRoutine;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -115,5 +117,20 @@ class WorkoutSessionDailyJobTest {
         job.runFor(TODAY);
 
         verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
+    }
+
+    @Test
+    void shouldRunTheJobOnStartupToCatchUpAMissedCron() {
+        job.runOnStartup();
+
+        verify(workoutSessionCommandService).handle(any(SkipOverdueWorkoutSessionsCommand.class));
+    }
+
+    @Test
+    void shouldNotStopTheApplicationWhenTheStartupCatchUpFails() {
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(workoutSessionCommandService).handle(any(SkipOverdueWorkoutSessionsCommand.class));
+
+        assertThatCode(() -> job.runOnStartup()).doesNotThrowAnyException();
     }
 }
