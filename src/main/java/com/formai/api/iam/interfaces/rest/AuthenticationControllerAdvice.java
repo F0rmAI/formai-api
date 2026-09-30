@@ -4,6 +4,7 @@ import com.formai.api.iam.domain.exceptions.AccountLockedException;
 import com.formai.api.iam.domain.exceptions.ApplicationNotAllowedException;
 import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.exceptions.InvalidCredentialsException;
+import com.formai.api.iam.domain.exceptions.InvalidRefreshTokenException;
 import com.formai.api.iam.domain.exceptions.PasswordPolicyViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,11 @@ public class AuthenticationControllerAdvice {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
         log.warn("Sign-in attempt failed");
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
