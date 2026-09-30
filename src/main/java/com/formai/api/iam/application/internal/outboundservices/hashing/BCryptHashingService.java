@@ -11,7 +11,11 @@ import java.util.Base64;
 @Service
 public class BCryptHashingService implements HashingService {
 
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    // Cost 12 (NFR-005). Hashes stored with a lower cost still match: bcrypt keeps the
+    // cost inside each hash.
+    private static final int COST = 12;
+
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(COST);
 
     @Override
     public String hash(String rawPassword) {
