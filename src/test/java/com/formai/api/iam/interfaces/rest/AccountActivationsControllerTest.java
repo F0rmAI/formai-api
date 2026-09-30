@@ -36,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountActivationsControllerTest {
 
     private static final String BODY =
-            "{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\",\"consentAccepted\":true}";
+            "{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\",\"consentAccepted\":true,"
+                    + "\"consentVersion\":\"1.0\"}";
 
     @Autowired
     MockMvc mockMvc;
@@ -49,7 +50,7 @@ class AccountActivationsControllerTest {
 
     private void commandIsAssembled() {
         when(assembler.toCommand(any(CreateAccountActivationResource.class)))
-                .thenReturn(new ActivateAccountCommand("ABCD2345", "secret123", true));
+                .thenReturn(new ActivateAccountCommand("ABCD2345", "secret123", true, "1.0"));
     }
 
     @Test
@@ -70,7 +71,15 @@ class AccountActivationsControllerTest {
     @Test
     void shouldReturn400WhenActivationCodeIsBlank() throws Exception {
         mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activationCode\":\"\",\"password\":\"secret123\",\"consentAccepted\":true}"))
+                        .content("{\"activationCode\":\"\",\"password\":\"secret123\",\"consentAccepted\":true,"
+                                + "\"consentVersion\":\"1.0\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenConsentVersionIsMissing() throws Exception {
+        mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\",\"consentAccepted\":true}"))
                 .andExpect(status().isBadRequest());
     }
 

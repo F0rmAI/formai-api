@@ -1,5 +1,6 @@
 package com.formai.api.planning.interfaces.rest;
 
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
 import com.formai.api.planning.domain.model.queries.GetRoutineByIdQuery;
@@ -73,11 +74,19 @@ class AssignmentsControllerTest {
     }
 
     @Test
-    void shouldReturnAnEmptyListForAClientThatIsNotTheTrainers() throws Exception {
+    void shouldReturnAnEmptyListForAClientWithoutAssignments() throws Exception {
         when(clientPlanQueryService.handle(any(GetClientPlanQuery.class))).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldReturn403ForAClientThatIsNotTheTrainers() throws Exception {
+        when(clientPlanQueryService.handle(any(GetClientPlanQuery.class))).thenThrow(new ClientAccessDeniedException());
+
+        mockMvc.perform(get("/api/v1/clients/" + CLIENT_ID.value() + "/assignments").with(TRAINER))
+                .andExpect(status().isForbidden());
     }
 }

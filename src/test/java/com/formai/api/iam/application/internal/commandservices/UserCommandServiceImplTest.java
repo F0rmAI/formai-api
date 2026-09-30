@@ -266,7 +266,7 @@ class UserCommandServiceImplTest {
     void shouldThrowWhenActivatingWithUnknownCode() {
         when(userRepository.findByActivationCode("UNKNOWN1")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> commandService.handle(new ActivateAccountCommand("UNKNOWN1", "secret123", true)))
+        assertThatThrownBy(() -> commandService.handle(new ActivateAccountCommand("UNKNOWN1", "secret123", true, "1.0")))
                 .isInstanceOf(InvalidActivationCodeException.class);
     }
 
@@ -280,7 +280,7 @@ class UserCommandServiceImplTest {
         saveReturnsArgument();
 
         // Act
-        var result = commandService.handle(new ActivateAccountCommand(code, "secret123", true));
+        var result = commandService.handle(new ActivateAccountCommand(code, "secret123", true, "1.0"));
 
         // Assert
         assertThat(result).isPresent();

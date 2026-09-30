@@ -5,8 +5,10 @@ import com.formai.api.iam.domain.model.aggregates.User;
 import com.formai.api.iam.domain.model.commands.CreateClientAccountCommand;
 import com.formai.api.iam.domain.model.commands.DisableAccountCommand;
 import com.formai.api.iam.domain.model.commands.ReissueActivationCodeCommand;
+import com.formai.api.iam.domain.model.commands.RevokeAllRefreshTokensCommand;
 import com.formai.api.iam.domain.model.queries.GetUserByIdQuery;
 import com.formai.api.iam.domain.model.valueobjects.Email;
+import com.formai.api.iam.domain.services.RefreshTokenCommandService;
 import com.formai.api.iam.domain.services.UserCommandService;
 import com.formai.api.iam.domain.services.UserQueryService;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,9 @@ class IamContextFacadeImplTest {
 
     @Mock
     UserQueryService userQueryService;
+
+    @Mock
+    RefreshTokenCommandService refreshTokenCommandService;
 
     @InjectMocks
     IamContextFacadeImpl facade;
@@ -92,6 +97,7 @@ class IamContextFacadeImplTest {
 
         assertThat(facade.disableAccount(client.getId())).isTrue();
         verify(userCommandService).handle(new DisableAccountCommand(client.getId()));
+        verify(refreshTokenCommandService).handle(new RevokeAllRefreshTokensCommand(client.getId()));
     }
 
     @Test

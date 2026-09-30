@@ -5,12 +5,18 @@ import com.formai.api.iam.domain.exceptions.AccountLockedException;
 import com.formai.api.iam.domain.exceptions.ApplicationNotAllowedException;
 import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.exceptions.PasswordPolicyViolationException;
+import com.formai.api.iam.domain.model.aggregates.RefreshToken;
 import com.formai.api.iam.domain.model.aggregates.User;
+import com.formai.api.iam.domain.model.commands.IssueRefreshTokenCommand;
+import com.formai.api.iam.domain.model.commands.RevokeRefreshTokenCommand;
+import com.formai.api.iam.domain.model.commands.RotateRefreshTokenCommand;
 import com.formai.api.iam.domain.model.commands.SignInCommand;
 import com.formai.api.iam.domain.model.commands.SignUpCommand;
 import com.formai.api.iam.domain.model.valueobjects.ClientApplication;
 import com.formai.api.iam.domain.model.valueobjects.Email;
 import com.formai.api.iam.domain.model.valueobjects.HashedPassword;
+import com.formai.api.iam.domain.model.valueobjects.RefreshedSession;
+import com.formai.api.iam.domain.services.RefreshTokenCommandService;
 import com.formai.api.iam.domain.services.UserCommandService;
 import com.formai.api.iam.interfaces.rest.resources.AuthenticatedUserResource;
 import com.formai.api.iam.interfaces.rest.resources.SignInResource;
@@ -29,15 +35,19 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import jakarta.servlet.http.Cookie;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -61,6 +71,9 @@ class AuthenticationControllerTest {
     UserCommandService userCommandService;
 
     @MockitoBean
+    RefreshTokenCommandService refreshTokenCommandService;
+
+    @MockitoBean
     TokenService tokenService;
 
     @MockitoBean
@@ -69,6 +82,10 @@ class AuthenticationControllerTest {
     private static User trainer() {
         return User.registerTrainer(new SignUpCommand(new Email("trainer@formai.com"), "secret123", "Ana Trainer"),
                 new HashedPassword("hashed"));
+    }
+
+    private static RefreshToken refreshTokenOf(User user) {
+        return RefreshToken.issue(new IssueRefreshTokenCommand(user.getId()), Instant.now(), Duration.ofDays(7));
     }
 
     private void signUpCommandIsAssembled() {
@@ -132,6 +149,8 @@ class AuthenticationControllerTest {
         var user = trainer();
         signInCommandIsAssembled();
         when(userCommandService.handle(any(SignInCommand.class))).thenReturn(Optional.of(user));
+        var refreshToken = refreshTokenOf(user);
+        when(refreshTokenCommandService.handle(any(IssueRefreshTokenCommand.class))).thenReturn(Optional.of(refreshToken));
         when(tokenService.issueFor(anyString(), anySet())).thenReturn("signed-jwt");
         when(assembler.toAuthenticatedResource(user)).thenReturn(new AuthenticatedUserResource(user.getId(),
                 "trainer@formai.com", Set.of("REGISTERED_USER", "TRAINER"), "ACTIVE"));
@@ -140,8 +159,47 @@ class AuthenticationControllerTest {
         mockMvc.perform(post("/api/v1/authentication/sign-in")
                         .contentType(MediaType.APPLICATION_JSON).content(SIGN_IN_BODY))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString(JwtCookieFactory.COOKIE_NAME + "=signed-jwt")))
+                .andExpect(header().stringValues(HttpHeaders.SET_COOKIE, hasItems(
+                        containsString(JwtCookieFactory.COOKIE_NAME + "=signed-jwt"),
+                        containsString(JwtCookieFactory.REFRESH_COOKIE_NAME + "=" + refreshToken.getRawValue().orElseThrow()))))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void shouldReturn200AndRenewBothCookiesWhenRefreshing() throws Exception {
+        // Arrange
+        var user = trainer();
+        var next = refreshTokenOf(user);
+        when(refreshTokenCommandService.handle(new RotateRefreshTokenCommand("current-refresh")))
+                .thenReturn(Optional.of(new RefreshedSession(user, next.getRawValue().orElseThrow())));
+        when(tokenService.issueFor(anyString(), anySet())).thenReturn("renewed-jwt");
+        when(assembler.toAuthenticatedResource(user)).thenReturn(new AuthenticatedUserResource(user.getId(),
+                "trainer@formai.com", Set.of("REGISTERED_USER", "TRAINER"), "ACTIVE"));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/v1/authentication/refresh")
+                        .cookie(new Cookie(JwtCookieFactory.REFRESH_COOKIE_NAME, "current-refresh")))
+                .andExpect(status().isOk())
+                .andExpect(header().stringValues(HttpHeaders.SET_COOKIE, hasItems(
+                        containsString(JwtCookieFactory.COOKIE_NAME + "=renewed-jwt"),
+                        containsString(JwtCookieFactory.REFRESH_COOKIE_NAME + "=" + next.getRawValue().orElseThrow()))))
+                .andExpect(jsonPath("$.email").value("trainer@formai.com"));
+    }
+
+    @Test
+    void shouldReturn401WhenRefreshingWithoutACookie() throws Exception {
+        mockMvc.perform(post("/api/v1/authentication/refresh"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn401WhenTheRefreshTokenIsNotUsable() throws Exception {
+        when(refreshTokenCommandService.handle(new RotateRefreshTokenCommand("revoked-refresh")))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/authentication/refresh")
+                        .cookie(new Cookie(JwtCookieFactory.REFRESH_COOKIE_NAME, "revoked-refresh")))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -189,5 +247,17 @@ class AuthenticationControllerTest {
         mockMvc.perform(post("/api/v1/authentication/sign-out"))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+    }
+
+    @Test
+    void shouldRevokeTheRefreshTokenAndClearBothCookiesWhenSigningOut() throws Exception {
+        mockMvc.perform(post("/api/v1/authentication/sign-out")
+                        .cookie(new Cookie(JwtCookieFactory.REFRESH_COOKIE_NAME, "current-refresh")))
+                .andExpect(status().isNoContent())
+                .andExpect(header().stringValues(HttpHeaders.SET_COOKIE, hasItems(
+                        containsString(JwtCookieFactory.COOKIE_NAME + "=;"),
+                        containsString(JwtCookieFactory.REFRESH_COOKIE_NAME + "=;"))));
+
+        verify(refreshTokenCommandService).handle(new RevokeRefreshTokenCommand("current-refresh"));
     }
 }

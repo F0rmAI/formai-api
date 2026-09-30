@@ -36,7 +36,7 @@ class UserTest {
     }
 
     private static ActivateAccountCommand activation(User client, String rawPassword, boolean consentAccepted) {
-        return new ActivateAccountCommand(client.getActivationCode().getCode(), rawPassword, consentAccepted);
+        return new ActivateAccountCommand(client.getActivationCode().getCode(), rawPassword, consentAccepted, "1.0");
     }
 
     @Test
@@ -109,12 +109,13 @@ class UserTest {
         assertThat(client.getHashedPassword()).isEqualTo(HASHED);
         assertThat(client.getActivationCode().getUsedAt()).isEqualTo(activatedAt);
         assertThat(client.getDataConsent().acceptedAt()).isEqualTo(activatedAt);
+        assertThat(client.getDataConsent().version()).isEqualTo("1.0");
     }
 
     @Test
     void shouldRejectActivationWhenCodeDoesNotMatch() {
         var client = pendingClient();
-        var command = new ActivateAccountCommand("WRONGCOD", "secret123", true);
+        var command = new ActivateAccountCommand("WRONGCOD", "secret123", true, "1.0");
 
         assertThatThrownBy(() -> client.activate(command, HASHED, NOW))
                 .isInstanceOf(InvalidActivationCodeException.class);
@@ -137,6 +138,15 @@ class UserTest {
 
         assertThatThrownBy(() -> client.activate(command, HASHED, NOW))
                 .isInstanceOf(InvalidActivationCodeException.class);
+    }
+
+    @Test
+    void shouldRejectActivationWhenConsentVersionIsBlank() {
+        var client = pendingClient();
+        var command = new ActivateAccountCommand(client.getActivationCode().getCode(), "secret123", true, " ");
+
+        assertThatThrownBy(() -> client.activate(command, HASHED, NOW))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -1,8 +1,11 @@
 package com.formai.api.planning.application.internal.queryservices;
 
+import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
+import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
 import com.formai.api.planning.domain.model.queries.GetRoutineVersionsQuery;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
@@ -21,6 +24,7 @@ import static com.formai.api.planning.PlanningTestData.emptyPlan;
 import static com.formai.api.planning.PlanningTestData.routine;
 import static com.formai.api.planning.PlanningTestData.twoSessions;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +35,9 @@ class PlanningQueryServicesTest {
 
     @Mock
     ClientPlanRepository clientPlanRepository;
+
+    @Mock
+    ExternalClientsService externalClientsService;
 
     @Test
     void shouldListTheVersionsMostRecentFirst() {
@@ -64,7 +71,7 @@ class PlanningQueryServicesTest {
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
         when(routineRepository.findById(routine.getId())).thenReturn(Optional.of(routine));
 
-        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository)
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
                 .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)).orElseThrow();
 
         assertThat(active.routine()).isSameAs(routine);
@@ -82,7 +89,7 @@ class PlanningQueryServicesTest {
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
         when(routineRepository.findById(previous.getId())).thenReturn(Optional.of(previous));
 
-        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository)
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
                 .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)).orElseThrow();
 
         assertThat(active.routine()).isSameAs(previous);
@@ -96,7 +103,26 @@ class PlanningQueryServicesTest {
         plan.closeCurrentAssignment(START_DATE.plusDays(3));
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
 
-        assertThat(new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository)
+        assertThat(new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
                 .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID))).isEmpty();
+    }
+
+    @Test
+    void shouldReturnTheAssignmentHistoryOfOneOfTheTrainersClientsEvenIfInactive() {
+        var plan = emptyPlan();
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(false));
+        when(clientPlanRepository.findByClientIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(plan));
+
+        assertThat(new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetClientPlanQuery(CLIENT_ID, TRAINER_HOLDER_ID))).contains(plan);
+    }
+
+    @Test
+    void shouldDenyTheAssignmentHistoryOfAnotherTrainersClient() {
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+        var service = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService);
+
+        assertThatThrownBy(() -> service.handle(new GetClientPlanQuery(CLIENT_ID, TRAINER_HOLDER_ID)))
+                .isInstanceOf(ClientAccessDeniedException.class);
     }
 }
