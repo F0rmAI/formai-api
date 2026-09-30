@@ -44,6 +44,7 @@ public interface UserAssembler {
     @Mapping(target = "activationCode", source = "resource.activationCode")
     @Mapping(target = "rawPassword", source = "resource.password")
     @Mapping(target = "consentAccepted", source = "resource.consentAccepted")
+    @Mapping(target = "consentVersion", source = "resource.consentVersion")
     ActivateAccountCommand toCommand(CreateAccountActivationResource resource);
 
     @Mapping(target = "email", source = "resource.email")

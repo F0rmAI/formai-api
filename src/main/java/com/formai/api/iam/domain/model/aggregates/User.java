@@ -101,7 +101,7 @@ public class User {
         this.hashedPassword = hashedPassword;
         this.status = AccountStatus.ACTIVE;
         this.activationCode.markUsed(now);
-        this.dataConsent = new ConsentAcceptance(now);
+        this.dataConsent = new ConsentAcceptance(command.consentVersion(), now);
     }
 
     public boolean canSignInFrom(ClientApplication application) {

@@ -9,7 +9,6 @@ import com.formai.api.iam.infrastructure.persistence.entities.UserJpaEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import java.time.Instant;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -18,12 +17,13 @@ public interface UserJpaMapper {
 
     @Mapping(target = "failedSignInCount", source = "failedSignIns.count")
     @Mapping(target = "lockedUntil", source = "failedSignIns.lockedUntil")
-    @Mapping(target = "dataConsentAcceptedAt", source = "dataConsent")
+    @Mapping(target = "dataConsentAcceptedAt", source = "dataConsent.acceptedAt")
+    @Mapping(target = "dataConsentVersion", source = "dataConsent.version")
     UserJpaEntity toEntity(User user);
 
     @Mapping(target = "failedSignIns.count", source = "failedSignInCount")
     @Mapping(target = "failedSignIns.lockedUntil", source = "lockedUntil")
-    @Mapping(target = "dataConsent", source = "dataConsentAcceptedAt")
+    @Mapping(target = "dataConsent", expression = "java(mapConsentAcceptance(entity))")
     User toDomain(UserJpaEntity entity);
 
     // required by MapStruct: single-field VOs need an explicit converter.
@@ -43,12 +43,9 @@ public interface UserJpaMapper {
         return value == null ? null : new HashedPassword(value);
     }
 
-    default Instant map(ConsentAcceptance consentAcceptance) {
-        return consentAcceptance == null ? null : consentAcceptance.acceptedAt();
-    }
-
-    default ConsentAcceptance mapConsentAcceptance(Instant acceptedAt) {
-        return acceptedAt == null ? null : new ConsentAcceptance(acceptedAt);
+    default ConsentAcceptance mapConsentAcceptance(UserJpaEntity entity) {
+        return entity.getDataConsentAcceptedAt() == null ? null
+                : new ConsentAcceptance(entity.getDataConsentVersion(), entity.getDataConsentAcceptedAt());
     }
 
     default Set<String> mapRoles(Set<Role> roles) {

@@ -53,6 +53,9 @@ public class UserJpaEntity {
     @Column(name = "data_consent_accepted_at")
     private Instant dataConsentAcceptedAt;
 
+    @Column(name = "data_consent_version", length = 20)
+    private String dataConsentVersion;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -138,6 +141,14 @@ public class UserJpaEntity {
 
     public void setDataConsentAcceptedAt(Instant dataConsentAcceptedAt) {
         this.dataConsentAcceptedAt = dataConsentAcceptedAt;
+    }
+
+    public String getDataConsentVersion() {
+        return dataConsentVersion;
+    }
+
+    public void setDataConsentVersion(String dataConsentVersion) {
+        this.dataConsentVersion = dataConsentVersion;
     }
 
     public Instant getCreatedAt() {
