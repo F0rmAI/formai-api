@@ -13,7 +13,7 @@ through Open Host Services and domain events rather than over the network.
 
 - RESTful API
 - Domain-Driven Design (modular monolith)
-- Own JWT authentication (locally issued by the IAM module, carried in an httpOnly cookie)
+- Own JWT authentication (locally issued by the IAM module, carried in an httpOnly cookie) with a rotating refresh token
 - Role- and channel-aware sign-in (trainers on the web platform, clients on the mobile app)
 - Account lockout, client activation codes and password recovery
 - Trainer client management with body profiles and weight history
@@ -44,7 +44,7 @@ its own domain, application, infrastructure, and interfaces layers.
 The IAM Context owns every FormAI account (trainers and clients) and how they get in:
 
 - **Trainer sign-up** with email, full name and a password (8–128 characters), stored as
-  a BCrypt hash. The account is created `ACTIVE` with the `REGISTERED_USER` and `TRAINER`
+  a BCrypt hash (cost 12). The account is created `ACTIVE` with the `REGISTERED_USER` and `TRAINER`
   roles.
 - **Sign-in per client application.** Clients sign in only from the mobile app
   (`MOBILE_APP`); trainers and administrators only from the web platform (`WEB_PLATFORM`).
@@ -52,11 +52,17 @@ The IAM Context owns every FormAI account (trainers and clients) and how they ge
   whether the email exists or not.
 - **Account lockout.** The fifth consecutive failed sign-in locks the account for 15
   minutes (`429`). A successful sign-in resets the counter.
-- **Sign-out** clears the httpOnly JWT cookie server-side.
+- **Session renewal.** Sign-in also sets a 7-day `refresh_token` cookie. `POST
+  /authentication/refresh` swaps it for a new JWT and a new refresh token; the one used stops
+  working, and reusing a revoked one revokes every session of the account. Only its SHA-256
+  hash is stored.
+- **Sign-out** revokes the refresh token and clears both httpOnly cookies server-side.
+  Disabling an account revokes all of its refresh tokens.
 - **Client accounts with activation codes.** A trainer creates a client account
   `PENDING_ACTIVATION` with a one-time, 8-character code valid for 72 hours, shown on screen
   and shared by hand. Reissuing a code replaces the previous one. The client activates the
-  account with the code, a password and the personal data processing consent.
+  account with the code, a password and the personal data processing consent, recorded with
+  the version of the consent text and the acceptance date (Law No. 29733).
 - **Password reset by email.** A request issues a one-time link token valid for 30
   minutes, and only its SHA-256 hash is stored. The request always answers the same
   message, whether the email exists or not.
@@ -231,8 +237,9 @@ always through an OHS facade or a domain event.
 cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64)
 ```
 
-`PASSWORD_RESET_URL` (the front-end page that receives the reset token) and
-`NOTIFICATIONS_DISPATCHER_DELAY` are optional; `.env.example` shows their defaults.
+`PASSWORD_RESET_URL` (the front-end page that receives the reset token),
+`NOTIFICATIONS_DISPATCHER_DELAY`, `JWT_EXPIRATION_MINUTES` (30) and `JWT_REFRESH_EXPIRATION_DAYS` (7)
+are optional; `.env.example` shows their defaults.
 
 ### Running the application
 
@@ -327,7 +334,7 @@ accepts pull requests, each requiring the CI <code>build</code> job to pass.
 
 JWT authentication is enabled by default (`shared/config/SecurityConfig`), in every
 environment — there is no permit-all development mode. `/api/v1/authentication/**`
-stays public (sign-up/sign-in/sign-out), as do `POST` on `/api/v1/account-activations`,
+stays public (sign-up/sign-in/refresh/sign-out), as do `POST` on `/api/v1/account-activations`,
 `/api/v1/password-reset-requests` and `/api/v1/password-resets`; every other endpoint
 requires a valid JWT. Trainer routes (`/clients/**`, `/exercises/**`, `/routines/**`,
 `/client-overviews/**`) also require `ROLE_TRAINER`, and client routes (`/active-routines/**`,
@@ -338,8 +345,11 @@ The JWT never travels in the response body or a header the client sets manually:
 sign-in, it's set as an **httpOnly, `SameSite=Lax` cookie** (`shared/config/JwtCookieFactory`),
 so client-side JavaScript — and therefore XSS — can never read or exfiltrate it. The
 browser attaches it automatically on later requests, and `JwtAuthenticationFilter`
-reads it from the cookie rather than an `Authorization` header. Because JS cannot
-delete an httpOnly cookie itself, `/sign-out` clears it server-side.
+reads it from the cookie rather than an `Authorization` header. The JWT lasts 30 minutes;
+a second httpOnly cookie, `refresh_token` (7 days, sent only to `/api/v1/authentication`),
+renews it through `POST /api/v1/authentication/refresh` and rotates on every use. Because JS
+cannot delete an httpOnly cookie itself, `/sign-out` revokes the refresh token and clears both
+cookies server-side.
 
 A browser frontend on a different origin (e.g. a Vite/React dev server) needs CORS
 configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` in
@@ -349,28 +359,33 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 
 ### OWASP coverage (SSDLC)
 
-- **A02 (Cryptographic Failures):** BCrypt password hashing (SHA-256 pre-hash so passwords up
-  to 128 characters fit BCrypt's 72-byte limit), signed JWT (never `alg: none`). Password
-  reset tokens are stored only as SHA-256 hashes.
+- **A02 (Cryptographic Failures):** BCrypt password hashing with cost 12 (SHA-256 pre-hash so
+  passwords up to 128 characters fit BCrypt's 72-byte limit), signed JWT (never `alg: none`).
+  Password reset and refresh tokens are stored only as SHA-256 hashes.
 - **A03 (Injection):** Spring Data JPA plus Bean Validation at the edge, no concatenated SQL.
 - **A04 (Insecure Design):** sign-in returns a single generic error, never revealing whether the
   email exists or the password was wrong, and a password reset request always answers the
   same message (prevents user enumeration).
 - **A08 (Logging Failures):** failed sign-in attempts are logged without the password.
-- **A10 (Authentication Attacks):** stateless, short-lived JWT, and account lockout for 15
-  minutes after 5 consecutive failed sign-ins. MFA is out of scope for now.
+- **A10 (Authentication Attacks):** stateless, 30-minute JWT; 7-day refresh token rotated on
+  every use, revoked on sign-out and on account deactivation, with reuse detection; account
+  lockout for 15 minutes after 5 consecutive failed sign-ins. MFA is out of scope for now.
 
 ## User Stories Coverage
 
 User stories of the requirements specification (`FormAI_Requirements_Specification.md`) that are
 ready to use. New development starts from this table.
 
+The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 and US-034;
+all of them are delivered, with US-005 partial (see below). US-018 and US-030 belong to the final
+increment (TB2) and are delivered ahead of it.
+
 | US | User story | Endpoint | What it does |
 |---|---|---|---|
 | US-001 | As a personal trainer, sign up with my email and password | `POST /api/v1/authentication/sign-up` | Creates an active trainer account with a BCrypt-hashed password; a taken email answers `409` |
-| US-002 | As a trainer or client, sign in and sign out securely | `POST /api/v1/authentication/sign-in` · `POST /api/v1/authentication/sign-out` | Issues the JWT in an httpOnly cookie per channel (trainers on the web, clients on the app), locks the account after 5 failures, and clears the cookie on sign-out |
+| US-002 | As a trainer or client, sign in and sign out securely | `POST /api/v1/authentication/sign-in` · `POST /api/v1/authentication/refresh` · `POST /api/v1/authentication/sign-out` | Issues the JWT and a rotating refresh token in httpOnly cookies per channel (trainers on the web, clients on the app), locks the account after 5 failures, and revokes the session on sign-out |
 | US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with a 72-hour activation code and renews it, invalidating the previous one |
-| US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/account-activations` | Activates the account with a valid code, a password and the data processing consent |
+| US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/account-activations` | Activates the account with a valid code, a password and the data processing consent with the version of its text |
 | US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history |
 | US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
 | US-008 | As a trainer, create routines with sessions, exercises, sets, reps and loads | `POST /api/v1/routines` · `GET /api/v1/routines?page&size` · `GET /api/v1/routines/{id}` · `POST /api/v1/routines/{id}/duplicates` | Creates routines as `DRAFT`, rejects invalid prescriptions and duplicates a routine without its clients |
@@ -398,6 +413,7 @@ exists.
 |---|---|---|---|---|---|
 | `POST` | `/api/v1/authentication/sign-up` | Account access | `201` | `400` `409` `422` | No |
 | `POST` | `/api/v1/authentication/sign-in` | Account access | `200` + JWT cookie | `400` `401` `403` `429` | No |
+| `POST` | `/api/v1/authentication/refresh` | Account access | `200` + new cookies | `401` | No (refresh cookie) |
 | `POST` | `/api/v1/authentication/sign-out` | Account access | `204` | — | No |
 | `POST` | `/api/v1/account-activations` | Account access | `201` | `400` `422` | No |
 | `POST` | `/api/v1/password-reset-requests` | Account access | `201` | `400` | No |
@@ -462,7 +478,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 375 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 399 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
