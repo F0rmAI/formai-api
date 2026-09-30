@@ -1,5 +1,7 @@
 package com.formai.api.planning.application.internal.queryservices;
 
+import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.entities.Assignment;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
@@ -18,14 +20,22 @@ public class ClientPlanQueryServiceImpl implements ClientPlanQueryService {
 
     private final ClientPlanRepository clientPlanRepository;
     private final RoutineRepository routineRepository;
+    private final ExternalClientsService externalClientsService;
 
-    public ClientPlanQueryServiceImpl(ClientPlanRepository clientPlanRepository, RoutineRepository routineRepository) {
+    public ClientPlanQueryServiceImpl(ClientPlanRepository clientPlanRepository, RoutineRepository routineRepository,
+                                      ExternalClientsService externalClientsService) {
         this.clientPlanRepository = clientPlanRepository;
         this.routineRepository = routineRepository;
+        this.externalClientsService = externalClientsService;
     }
 
+    // Another trainer's client answers 403 (FR-016), even through a direct URL; one of the
+    // trainer's own clients, active or not, keeps its assignment history.
     @Override
     public Optional<ClientPlan> handle(GetClientPlanQuery query) {
+        if (externalClientsService.isActiveClientOfTrainer(query.clientId(), query.holderId()).isEmpty()) {
+            throw new ClientAccessDeniedException();
+        }
         return clientPlanRepository.findByClientIdAndHolderId(query.clientId(), query.holderId());
     }
 

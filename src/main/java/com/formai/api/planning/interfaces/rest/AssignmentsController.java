@@ -54,11 +54,12 @@ public class AssignmentsController {
 
     @Operation(summary = "Get a client's assignment history",
             description = "Every routine assigned to one of my clients, most recent first; the current one has no " +
-                    "end date. Empty when the client has none or is not one of mine.")
+                    "end date. Empty when the client has none.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "The assignments",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = AssignmentResource.class)))),
-            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, not a trainer, or not " +
+                    "one of your clients", content = @Content)
     })
     @GetMapping
     public ResponseEntity<List<AssignmentResource>> getByClient(@PathVariable UUID id, Authentication authentication) {
