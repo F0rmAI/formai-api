@@ -8,8 +8,9 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
   real send). Suite: 408 tests. Audit against the `qs-monolith-serv` canon: ~85 % (2026-10-01).
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
-- Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo), rebuilt
-  with `./build.sh` (skill `backlog-to-diagram`); never edit the `.puml`. US-030 is `[TB2]` there on purpose.
+- Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
+  `com.formai.api`); never edit the `.puml`. `FORMAI_API_REPO=<this repo> ./build.sh` rebuilds TP and TF and
+  compares them with the code (TF 414/414; TP lacks only the 5 US-030 classes, `[TB2]` on purpose).
 
 ## Decisions (and why)
 - Swagger tags by purpose, defined once in `shared/interfaces/rest/ApiTags`: controllers of several modules
