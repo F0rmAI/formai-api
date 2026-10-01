@@ -12,6 +12,8 @@ import java.util.UUID;
 
 public class Notification {
 
+    public static final int MAX_ATTEMPTS = 5;
+
     private NotificationId id;
     private String holderId;
     private Channel channel;
@@ -43,9 +45,11 @@ public class Notification {
         return notification;
     }
 
-    // A failed delivery stays due, so the dispatcher retries it.
+    // A failed delivery stays due, so the dispatcher retries it, up to MAX_ATTEMPTS: after that
+    // it stays FAILED for good, so a broken address or provider cannot be retried forever.
     public boolean isDue(Instant now) {
         return (status == NotificationStatus.SCHEDULED || status == NotificationStatus.FAILED)
+                && attempts < MAX_ATTEMPTS
                 && !scheduledAt.isAfter(now);
     }
 

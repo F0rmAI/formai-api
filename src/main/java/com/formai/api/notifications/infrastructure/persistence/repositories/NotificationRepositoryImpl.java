@@ -36,7 +36,7 @@ public class NotificationRepositoryImpl implements NotificationRepository {
 
     @Override
     public List<Notification> findAllDue(Instant now, int limit) {
-        return jpaRepository.findAllDue(now, limit).stream().map(mapper::toDomain).toList();
+        return jpaRepository.findAllDue(now, Notification.MAX_ATTEMPTS, limit).stream().map(mapper::toDomain).toList();
     }
 
     @Override
