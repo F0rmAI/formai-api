@@ -12,6 +12,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // fallbackExecution: iam publishes its events outside a transaction; without it Spring drops them.
+// Resilience: none, accepted. If this fails the Trainer is never created: the trainer's name only
+// travels in this event (iam does not keep it), so it cannot be rebuilt later. Nothing reads
+// Trainer yet, so there is no functional effect; revisit it when a feature needs the Trainer.
 @Component
 public class UserRegisteredEventHandler {
 

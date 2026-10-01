@@ -10,6 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+// Resilience: self-healing. If this fails, WorkoutSessionDailyJob syncs every active routine with
+// planning before scheduling the day's session, so the new version arrives the next day. Sessions
+// already recorded keep their routineVersion (FR-011).
 @Component
 public class RoutineUpdatedEventHandler {
 

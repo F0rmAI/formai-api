@@ -21,6 +21,10 @@ import java.time.LocalDate;
 // Two listeners, one aggregate each: the first syncs the ActiveRoutine and commits, then the
 // second schedules today's session from it, so a routine starting today can be trained today
 // instead of waiting for WorkoutSessionDailyJob.
+// Resilience: partial self-healing. If the sync fails, the client still sees the routine
+// (ActiveRoutineQueryService reads it from planning without storing it), but no session is
+// scheduled for them until the routine is assigned again: the daily job only walks the routines
+// already synced here. If only scheduling today's session fails, the daily job schedules it.
 @Component("trackingRoutineAssignedEventHandler")
 public class RoutineAssignedEventHandler {
 
