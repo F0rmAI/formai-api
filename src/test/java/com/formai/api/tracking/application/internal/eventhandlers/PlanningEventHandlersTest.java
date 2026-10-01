@@ -7,8 +7,8 @@ import com.formai.api.tracking.domain.exceptions.ActiveRoutineNotFoundException;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
-import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
 import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
 import org.junit.jupiter.api.Test;
@@ -16,8 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.UUID;
 
 import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
 import static com.formai.api.tracking.TrackingTestData.ROUTINE_ID;
@@ -29,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PlanningEventHandlersTest {
@@ -39,9 +36,6 @@ class PlanningEventHandlersTest {
 
     @Mock
     WorkoutSessionCommandService workoutSessionCommandService;
-
-    @Mock
-    ActiveRoutineRepository activeRoutineRepository;
 
     @Test
     void shouldSyncTheClientsRoutineWhenARoutineIsAssigned() {
@@ -82,16 +76,11 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldSyncEveryClientFollowingARoutineWhenItIsUpdated() {
-        var otherClient = new ClientId(UUID.randomUUID());
-        var otherRoutine = activeRoutine();
-        otherRoutine.setClientId(otherClient);
-        when(activeRoutineRepository.findAllByRoutineId(ROUTINE_ID)).thenReturn(List.of(activeRoutine(), otherRoutine));
-        var handler = new RoutineUpdatedEventHandler(activeRoutineRepository, activeRoutineCommandService);
+        var handler = new RoutineUpdatedEventHandler(activeRoutineCommandService);
 
         handler.on(new RoutineUpdated(ROUTINE_ID.value(), 2));
 
-        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(CLIENT_ID));
-        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(otherClient));
+        verify(activeRoutineCommandService).handle(new SyncActiveRoutinesOfRoutineCommand(ROUTINE_ID));
     }
 
     @Test

@@ -58,6 +58,46 @@ class NotificationTest {
     }
 
     @Test
+    void shouldStopBeingRetriedOnceItsAttemptsAreUsedUp() {
+        var notification = scheduledPasswordResetEmail();
+
+        for (int attempt = 0; attempt < Notification.MAX_ATTEMPTS; attempt++) {
+            notification.markFailed();
+        }
+
+        assertThat(notification.getStatus()).isEqualTo(NotificationStatus.FAILED);
+        assertThat(notification.isDue(NOW)).isFalse();
+    }
+
+    @Test
+    void shouldKeepTheBodyWhileADeliveryCanStillBeRetried() {
+        var notification = scheduledPasswordResetEmail();
+        var body = notification.getBody();
+
+        notification.markFailed();
+
+        assertThat(notification.isPending()).isTrue();
+        assertThat(notification.getBody()).isEqualTo(body);
+    }
+
+    @Test
+    void shouldRemoveTheBodyOnceTheDeliveryIsClosed() {
+        var sent = scheduledPasswordResetEmail();
+        var cancelled = scheduledPasswordResetEmail();
+        var exhausted = scheduledPasswordResetEmail();
+
+        sent.markSent(NOW);
+        cancelled.cancel();
+        for (int attempt = 0; attempt < Notification.MAX_ATTEMPTS; attempt++) {
+            exhausted.markFailed();
+        }
+
+        assertThat(sent.getBody()).isEqualTo(Notification.REDACTED_BODY);
+        assertThat(cancelled.getBody()).isEqualTo(Notification.REDACTED_BODY);
+        assertThat(exhausted.getBody()).isEqualTo(Notification.REDACTED_BODY);
+    }
+
+    @Test
     void shouldNeverBeDueOnceCancelled() {
         var notification = scheduledPasswordResetEmail();
 
