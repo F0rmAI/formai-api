@@ -2,13 +2,14 @@
 
 Inter-session project memory. This file contains about 50 lines: summarize or remove content that no longer adds value.
 
-## Current status (2026-09-30)
-- `develop` holds the TP (MVP, Sprints 1–2) backend: US-001…US-017 plus US-033/US-034 are delivered; US-005 is
-  partial (the reset email is only logged until an email provider is chosen). Suite: 399 tests, CI green.
+## Current status (2026-10-01)
+- The TP (MVP, Sprints 1–2) backend is complete: US-001…US-017 plus US-033/US-034 are delivered. US-005
+  sends the reset email through Brevo's SMTP relay (branch `feature/brevo-email-delivery`, verified with a
+  real send). Suite: 408 tests. Audit against the `qs-monolith-serv` canon: ~85 % (2026-10-01).
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
-- Code matches the TP class diagrams at ~90–100 % per context. The diagrams still lack `RefreshToken`,
-  `ConsentAcceptance.version`, the refresh endpoint and the US-030 slice.
+- Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo), rebuilt
+  with `./build.sh` (skill `backlog-to-diagram`); never edit the `.puml`. US-030 is `[TB2]` there on purpose.
 
 ## Decisions (and why)
 - Swagger tags by purpose, defined once in `shared/interfaces/rest/ApiTags`: controllers of several modules
@@ -19,6 +20,10 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
   (NFR-005); consent stored with the text version (NFR-021; accounts activated before are marked `legacy`).
 - `/clients/{id}/assignments` answers 403 for another trainer's client, like tracking's routes (FR-016).
 - `AGENTS.md` is the single instruction file; `CLAUDE.md` only imports it and this file.
+- Email goes through Brevo over SMTP (not its HTTP API, as the C4 said): the team's Brevo setup is SMTP and
+  Spring's `JavaMailSender` needs no vendor SDK. Failed emails are retried up to 5 times, to protect the
+  daily quota and because the reset link expires in 30 minutes anyway. The email body is redacted once the
+  delivery is closed, so the reset link is not kept in the database.
 
 ## Lessons learned and mistakes to avoid
 - Controller tests: use `.with(user(<real id>).roles(...))`, not `@WithMockUser` (holderId = `getName()`).
@@ -26,17 +31,23 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
 - Two eager `List` collections on one entity need `@OrderColumn` (multiple bags).
 - Same simple class name in two modules clashes as a bean name: name the bean explicitly.
 - Local runs need Docker Desktop up; restarting it may leave the database empty (Flyway rebuilds it).
+- A `try/catch` inside a `@Transactional` listener does not stop the failure: the rollback resurfaces as
+  `UnexpectedRollbackException`. Catch outside the transaction (`TransactionTemplate`).
 
 ## Open product questions (need a team decision)
 - Rest days: a session is scheduled every calendar day, so unrecorded rest days count as SKIPPED and lower
   adherence. Option: training days per assignment.
 - COMPLETED counts an exercise as done with one recorded set; should it require every prescribed set?
 - A session with records that is never finished stays PENDING; FR-014 does not say how to close it.
-- `notifications.body` stores the reset link with the raw token and keeps it after sending; retries have no cap.
+- Handlers without self-healing (stated in their comments): `UserRegistered`→Trainer (iam does not keep the
+  name), `ClientDeactivated`→close assignment, and tracking's `RoutineAssigned` sync (no sessions until reassigned).
 
 ## Next steps (to operate the MVP)
-- Choose the email provider (HTTPS API) and replace `SmtpEmailDeliveryService` (US-005).
+- Set the `SMTP_*` variables in the demo environment and in every teammate's `.env`.
 - Deployment: Dockerfile + `backend` service in compose, Caddy with TLS and a subdomain, on the Linux VM.
 - Daily Postgres backup with 7-day retention and one tested restore; external monitor on `/actuator/health`.
 - Quality evidence: k6 (P95 < 300 ms), OWASP ZAP baseline, JaCoCo ≥ 70 % on domain/application.
-- Update the TP class diagrams with the changes listed above.
+- Audit backlog: clients↔iam share one transaction on client registration/deactivation; iam and tracking
+  command services lack `@Transactional` (sign-in must keep its failed-attempt count on error); ArchUnit
+  layered rule; tests with a real JWT and a context-load test; SMTP send inside the DB transaction.
+- The web front end needs a `/password-reset` page: the emailed link points to `PASSWORD_RESET_URL`.
