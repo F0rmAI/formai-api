@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = AccountActivationsController.class)
+@RestControllerAdvice(assignableTypes = {AccountActivationsController.class,
+        ActivationCodeVerificationsController.class})
 public class AccountActivationsControllerAdvice {
 
     @ExceptionHandler(InvalidActivationCodeException.class)

@@ -6,9 +6,11 @@ import com.formai.api.iam.domain.model.commands.RequestPasswordResetCommand;
 import com.formai.api.iam.domain.model.commands.ResetPasswordCommand;
 import com.formai.api.iam.domain.model.commands.SignInCommand;
 import com.formai.api.iam.domain.model.commands.SignUpCommand;
+import com.formai.api.iam.domain.model.entities.ActivationCode;
 import com.formai.api.iam.domain.model.valueobjects.Email;
 import com.formai.api.iam.domain.model.valueobjects.Role;
 import com.formai.api.iam.interfaces.rest.resources.AccountActivationResource;
+import com.formai.api.iam.interfaces.rest.resources.ActivationCodeVerificationResource;
 import com.formai.api.iam.interfaces.rest.resources.AuthenticatedUserResource;
 import com.formai.api.iam.interfaces.rest.resources.CreateAccountActivationResource;
 import com.formai.api.iam.interfaces.rest.resources.CreatePasswordResetRequestResource;
@@ -69,6 +71,9 @@ public interface UserAssembler {
     @Mapping(target = "status", source = "user.status")
     @Mapping(target = "activatedAt", source = "user.activationCode.usedAt")
     AccountActivationResource toActivationResource(User user);
+
+    @Mapping(target = "expiresAt", source = "activationCode.expiresAt")
+    ActivationCodeVerificationResource toVerificationResource(ActivationCode activationCode);
 
     default PasswordResetRequestResource toPasswordResetRequestResource() {
         return new PasswordResetRequestResource(PASSWORD_RESET_REQUESTED_MESSAGE);

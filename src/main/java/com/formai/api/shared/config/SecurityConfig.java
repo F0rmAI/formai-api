@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/authentication/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/account-activations",
+                                "/api/v1/activation-code-verifications",
                                 "/api/v1/password-reset-requests",
                                 "/api/v1/password-resets").permitAll()
                         .requestMatchers("/actuator/health").permitAll()   // healthchecks send no JWT
