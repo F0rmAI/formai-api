@@ -60,7 +60,7 @@ class NotificationRepositoryImplTest {
     void shouldFindTheDueNotifications() {
         var entity = new NotificationJpaEntity();
         var notification = scheduledPasswordResetEmail();
-        when(jpaRepository.findAllDue(NOW, 50)).thenReturn(List.of(entity));
+        when(jpaRepository.findAllDue(NOW, Notification.MAX_ATTEMPTS, 50)).thenReturn(List.of(entity));
         when(mapper.toDomain(entity)).thenReturn(notification);
 
         assertThat(repository.findAllDue(NOW, 50)).containsExactly(notification);

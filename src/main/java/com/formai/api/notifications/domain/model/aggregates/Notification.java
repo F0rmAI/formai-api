@@ -12,6 +12,13 @@ import java.util.UUID;
 
 public class Notification {
 
+    public static final int MAX_ATTEMPTS = 5;
+
+    // The body can carry a secret (the password reset link). It is only needed until the delivery
+    // is closed, so it is replaced by this text once the notification is sent, cancelled or out
+    // of attempts: the token never stays in the database longer than the email is pending.
+    public static final String REDACTED_BODY = "[removed after delivery]";
+
     private NotificationId id;
     private String holderId;
     private Channel channel;
@@ -43,25 +50,35 @@ public class Notification {
         return notification;
     }
 
-    // A failed delivery stays due, so the dispatcher retries it.
-    public boolean isDue(Instant now) {
+    // A failed delivery stays pending, so the dispatcher retries it, up to MAX_ATTEMPTS: after that
+    // it stays FAILED for good, so a broken address or provider cannot be retried forever.
+    public boolean isPending() {
         return (status == NotificationStatus.SCHEDULED || status == NotificationStatus.FAILED)
-                && !scheduledAt.isAfter(now);
+                && attempts < MAX_ATTEMPTS;
+    }
+
+    public boolean isDue(Instant now) {
+        return isPending() && !scheduledAt.isAfter(now);
     }
 
     public void markSent(Instant at) {
         this.status = NotificationStatus.SENT;
         this.sentAt = at;
         this.attempts++;
+        this.body = REDACTED_BODY;
     }
 
     public void markFailed() {
         this.status = NotificationStatus.FAILED;
         this.attempts++;
+        if (!isPending()) {
+            this.body = REDACTED_BODY;
+        }
     }
 
     public void cancel() {
         this.status = NotificationStatus.CANCELLED;
+        this.body = REDACTED_BODY;
     }
 
     public NotificationId getId() {

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class NotificationCommandServiceImpl implements NotificationCommandService {
@@ -29,13 +30,15 @@ public class NotificationCommandServiceImpl implements NotificationCommandServic
         this.emailDeliveryService = emailDeliveryService;
     }
 
-    // A newer notification of the same type replaces the ones still waiting: a new password reset
-    // link invalidates the previous one, so the old email must not go out.
+    // A newer notification of the same type replaces the ones still pending (scheduled, or failed
+    // and waiting for a retry): a new password reset link invalidates the previous one, so the old
+    // email must not go out.
     @Override
     @Transactional
     public Optional<Notification> handle(ScheduleNotificationCommand command) {
-        notificationRepository.findAllByHolderIdAndStatus(command.holderId(), NotificationStatus.SCHEDULED).stream()
-                .filter(pending -> pending.getType() == command.type())
+        Stream.of(NotificationStatus.SCHEDULED, NotificationStatus.FAILED)
+                .flatMap(status -> notificationRepository.findAllByHolderIdAndStatus(command.holderId(), status).stream())
+                .filter(pending -> pending.getType() == command.type() && pending.isPending())
                 .forEach(pending -> {
                     pending.cancel();
                     notificationRepository.save(pending);

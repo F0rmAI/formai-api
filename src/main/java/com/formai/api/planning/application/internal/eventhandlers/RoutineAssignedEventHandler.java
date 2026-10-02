@@ -11,6 +11,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // Explicit bean name: tracking has an event handler with the same simple name.
+// Resilience: self-healing. One transaction, one aggregate: assigning changes the ClientPlan and
+// this marks the Routine ACTIVE after commit. If it fails only the status the trainer sees is
+// stale, and the next assignment of that routine runs it again (MarkRoutineActive is idempotent).
 @Component("planningRoutineAssignedEventHandler")
 public class RoutineAssignedEventHandler {
 

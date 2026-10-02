@@ -45,7 +45,6 @@ class NotificationCommandServiceImplTest {
 
     @Test
     void shouldScheduleTheNotification() {
-        when(notificationRepository.findAllByHolderIdAndStatus(HOLDER_ID, NotificationStatus.SCHEDULED)).thenReturn(List.of());
         savesReturnTheNotification();
 
         var notification = commandService.handle(passwordResetEmail(NOW)).orElseThrow();
@@ -67,8 +66,24 @@ class NotificationCommandServiceImplTest {
 
         // Assert
         assertThat(previous.getStatus()).isEqualTo(NotificationStatus.CANCELLED);
+        assertThat(previous.getBody()).isEqualTo(Notification.REDACTED_BODY);
         verify(notificationRepository).save(previous);
         assertThat(latest.getStatus()).isEqualTo(NotificationStatus.SCHEDULED);
+    }
+
+    @Test
+    void shouldCancelAPreviousFailedNotificationStillWaitingForARetry() {
+        var failed = scheduledPasswordResetEmail();
+        failed.markFailed();
+        when(notificationRepository.findAllByHolderIdAndStatus(HOLDER_ID, NotificationStatus.SCHEDULED))
+                .thenReturn(List.of());
+        when(notificationRepository.findAllByHolderIdAndStatus(HOLDER_ID, NotificationStatus.FAILED))
+                .thenReturn(List.of(failed));
+        savesReturnTheNotification();
+
+        commandService.handle(passwordResetEmail(NOW.plusSeconds(30)));
+
+        assertThat(failed.getStatus()).isEqualTo(NotificationStatus.CANCELLED);
     }
 
     @Test

@@ -20,7 +20,7 @@ through Open Host Services and domain events rather than over the network.
 - Exercise catalog, versioned routines and routine assignments
 - Workout logging with compliance status, history, progress reports and progress charts
 - Today's session scheduled on assignment, by a daily job and on startup; overdue ones skipped
-- Outbox of notifications (password reset email) delivered by a scheduled dispatcher
+- Outbox of notifications (password reset email) delivered by a scheduled dispatcher through Brevo's SMTP relay
 - Spring Boot Framework
 - Spring Data JPA
 - Bean Validation
@@ -176,13 +176,17 @@ password reset email (the only transactional email of the product):
   (`PASSWORD_RESET_URL` + token). A newer request cancels the email still waiting for the
   previous link, since IAM keeps only the latest token.
 - `PendingNotificationDispatcherJob` sends the due notifications every minute
-  (`NOTIFICATIONS_DISPATCHER_DELAY`) and retries the failed ones.
+  (`NOTIFICATIONS_DISPATCHER_DELAY`) and retries the failed ones, up to 5 attempts. Once an
+  email is sent, cancelled or out of attempts its body is replaced by a neutral text, so the
+  reset link is in the database only while the email is pending.
 - Resilience is outbox + reconciliation: the `Notification` row is the outbox. If the handler
   fails after IAM's commit no email goes out; the reset request still answers the same neutral
   message and the user can ask for a new link.
-- The email provider is still to be decided. `SmtpEmailDeliveryService` only logs that an
-  email is due (never the address or the body, which carries the token); replacing it with a
-  real provider is the only change needed.
+- `SmtpEmailDeliveryService` sends through Brevo's SMTP relay over STARTTLS (`SMTP_HOST`,
+  `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) from the sender verified in Brevo (`SMTP_FROM_EMAIL`,
+  `SMTP_FROM_NAME`). It never logs the address, the body (it carries the token) or the relay's
+  error message. Without those variables the application still starts and the email stays
+  `FAILED`.
 
 It has no REST endpoints and depends on no other context's facade.
 
@@ -239,7 +243,8 @@ cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64
 
 `PASSWORD_RESET_URL` (the front-end page that receives the reset token),
 `NOTIFICATIONS_DISPATCHER_DELAY`, `JWT_EXPIRATION_MINUTES` (30) and `JWT_REFRESH_EXPIRATION_DAYS` (7)
-are optional; `.env.example` shows their defaults.
+are optional; `.env.example` shows their defaults. To send the password reset email, set the
+Brevo SMTP variables (`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
 
 ### Running the application
 
@@ -361,7 +366,8 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 
 - **A02 (Cryptographic Failures):** BCrypt password hashing with cost 12 (SHA-256 pre-hash so
   passwords up to 128 characters fit BCrypt's 72-byte limit), signed JWT (never `alg: none`).
-  Password reset and refresh tokens are stored only as SHA-256 hashes.
+  Password reset and refresh tokens are stored only as SHA-256 hashes; the reset link kept in the
+  notification outbox is removed as soon as its delivery is closed.
 - **A03 (Injection):** Spring Data JPA plus Bean Validation at the edge, no concatenated SQL.
 - **A04 (Insecure Design):** sign-in returns a single generic error, never revealing whether the
   email exists or the password was wrong, and a password reset request always answers the
@@ -377,8 +383,8 @@ User stories of the requirements specification (`FormAI_Requirements_Specificati
 ready to use. New development starts from this table.
 
 The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 and US-034;
-all of them are delivered, with US-005 partial (see below). US-018 and US-030 belong to the final
-increment (TB2) and are delivered ahead of it.
+all of them are delivered. US-018 and US-030 belong to the final increment (TB2) and are delivered
+ahead of it, US-030 partially (see below).
 
 | US | User story | Endpoint | What it does |
 |---|---|---|---|
@@ -386,6 +392,7 @@ increment (TB2) and are delivered ahead of it.
 | US-002 | As a trainer or client, sign in and sign out securely | `POST /api/v1/authentication/sign-in` · `POST /api/v1/authentication/refresh` · `POST /api/v1/authentication/sign-out` | Issues the JWT and a rotating refresh token in httpOnly cookies per channel (trainers on the web, clients on the app), locks the account after 5 failures, and revokes the session on sign-out |
 | US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with a 72-hour activation code and renews it, invalidating the previous one |
 | US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/account-activations` | Activates the account with a valid code, a password and the data processing consent with the version of its text |
+| US-005 | As a trainer or client, reset my password from my email | `POST /api/v1/password-reset-requests` · `POST /api/v1/password-resets` | Emails a one-time link valid for 30 minutes through Brevo, answers the same message whether the email exists or not, and rejects a used or expired link |
 | US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history |
 | US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
 | US-008 | As a trainer, create routines with sessions, exercises, sets, reps and loads | `POST /api/v1/routines` · `GET /api/v1/routines?page&size` · `GET /api/v1/routines/{id}` · `POST /api/v1/routines/{id}/duplicates` | Creates routines as `DRAFT`, rejects invalid prescriptions and duplicates a routine without its clients |
@@ -402,10 +409,8 @@ increment (TB2) and are delivered ahead of it.
 | US-033 | As a trainer, restore an archived exercise of my catalog | `POST /api/v1/exercises/{id}/restorations` | Makes the exercise available again for new routines |
 | US-034 | As a trainer, assign a closed routine again, adjusting it if needed | `POST /api/v1/routines/{id}/assignments` · `PUT /api/v1/routines/{id}` | A routine with no open assignment becomes `CLOSED`; assigning it again reopens it without duplicating it, and editing it first adds a version |
 
-Partially delivered: **US-005** (password reset by email) works end to end, but the email is
-only logged until the email provider is decided; **US-030** (link exercises to published
-machines, `PUT /api/v1/exercises/{id}/machine-link`) answers `422` until the machine catalog
-exists.
+Partially delivered: **US-030** (link exercises to published machines,
+`PUT /api/v1/exercises/{id}/machine-link`) answers `422` until the machine catalog exists.
 
 ## API Endpoints
 
@@ -478,7 +483,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 399 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 408 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on

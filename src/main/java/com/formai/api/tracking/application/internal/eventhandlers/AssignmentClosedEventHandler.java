@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+// Resilience: self-healing. If this fails, WorkoutSessionDailyJob finds no current assignment in
+// planning for that client and ends the ActiveRoutine before scheduling new sessions.
 @Component
 public class AssignmentClosedEventHandler {
 
