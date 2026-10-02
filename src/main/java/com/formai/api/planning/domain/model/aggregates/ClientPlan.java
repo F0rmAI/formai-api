@@ -1,6 +1,7 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
+import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.entities.Assignment;
 import com.formai.api.planning.domain.model.valueobjects.AssignmentPeriod;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
@@ -38,6 +39,9 @@ public class ClientPlan {
             var previousStart = current.getPeriod().startDate();
             current.close(endDate.isBefore(previousStart) ? previousStart : endDate);
         });
+        // Whoever assigns is the client's trainer (checked before): the plan follows that trainer,
+        // which also repairs a plan left with the previous one after a failed transfer.
+        this.holderId = command.holderId();
         var assignment = new Assignment(command.routineId(), AssignmentPeriod.startingOn(command.startDate()));
         this.assignments = new ArrayList<>(assignments);
         this.assignments.add(assignment);
@@ -46,6 +50,13 @@ public class ClientPlan {
 
     public void closeCurrentAssignment(LocalDate endDate) {
         currentAssignment().ifPresent(current -> current.close(endDate));
+    }
+
+    // The client joined another trainer: the routine of the previous one stops applying and the
+    // whole assignment history goes with the client.
+    public void transferTo(TransferClientPlanCommand command) {
+        closeCurrentAssignment(command.date());
+        this.holderId = command.newHolderId();
     }
 
     public Optional<Assignment> currentAssignment() {

@@ -7,6 +7,7 @@ import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
+import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.entities.Assignment;
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
@@ -66,6 +67,17 @@ public class ClientPlanCommandServiceImpl implements ClientPlanCommandService {
         clientPlanRepository.findByClientId(command.clientId()).ifPresent(plan -> {
             var current = plan.currentAssignment();
             plan.closeCurrentAssignment(command.endDate());
+            clientPlanRepository.save(plan);
+            current.ifPresent(closed -> publishClosed(command.clientId(), closed));
+        });
+    }
+
+    @Override
+    @Transactional
+    public void handle(TransferClientPlanCommand command) {
+        clientPlanRepository.findByClientId(command.clientId()).ifPresent(plan -> {
+            var current = plan.currentAssignment();
+            plan.transferTo(command);
             clientPlanRepository.save(plan);
             current.ifPresent(closed -> publishClosed(command.clientId(), closed));
         });
