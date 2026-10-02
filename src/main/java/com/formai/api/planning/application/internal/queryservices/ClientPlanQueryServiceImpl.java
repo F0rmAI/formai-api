@@ -43,9 +43,11 @@ public class ClientPlanQueryServiceImpl implements ClientPlanQueryService {
     public Optional<ActiveAssignment> handle(GetActiveAssignmentByClientIdQuery query) {
         var today = LocalDate.now();
         return clientPlanRepository.findByClientId(query.clientId())
+                // The most recent one in effect: an assignment replaced the day it started still
+                // covers that day, and the one that replaced it must win.
                 .flatMap(plan -> plan.getAssignments().stream()
                         .filter(assignment -> isInEffectOn(assignment, today))
-                        .findFirst()
+                        .reduce((earlier, later) -> later)
                         .or(plan::currentAssignment))
                 .flatMap(assignment -> routineRepository.findById(assignment.getRoutineId())
                         .map(routine -> new ActiveAssignment(query.clientId(), routine,

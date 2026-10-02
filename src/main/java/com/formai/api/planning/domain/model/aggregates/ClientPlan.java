@@ -34,11 +34,7 @@ public class ClientPlan {
     }
 
     public Assignment assign(AssignRoutineCommand command) {
-        currentAssignment().ifPresent(current -> {
-            var endDate = command.startDate().minusDays(1);
-            var previousStart = current.getPeriod().startDate();
-            current.close(endDate.isBefore(previousStart) ? previousStart : endDate);
-        });
+        closeCurrentAssignmentBefore(command.startDate());
         // Whoever assigns is the client's trainer (checked before): the plan follows that trainer,
         // which also repairs a plan left with the previous one after a failed transfer.
         this.holderId = command.holderId();
@@ -56,8 +52,18 @@ public class ClientPlan {
     // The client joined another trainer: the routine of the previous one stops applying and the
     // whole assignment history goes with the client.
     public void transferTo(TransferClientPlanCommand command) {
-        closeCurrentAssignment(command.date());
+        closeCurrentAssignmentBefore(command.date());
         this.holderId = command.newHolderId();
+    }
+
+    // The assignment ends the day before, so it no longer applies on that date; one that started
+    // that same day cannot end before it started and ends on its start date.
+    private void closeCurrentAssignmentBefore(LocalDate date) {
+        currentAssignment().ifPresent(current -> {
+            var endDate = date.minusDays(1);
+            var start = current.getPeriod().startDate();
+            current.close(endDate.isBefore(start) ? start : endDate);
+        });
     }
 
     public Optional<Assignment> currentAssignment() {
