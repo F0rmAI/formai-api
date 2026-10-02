@@ -93,6 +93,11 @@ public class WorkoutSession {
         return exercises.stream().allMatch(SessionExercise::isComplete);
     }
 
+    // Still untouched: it can be dropped when the routine it came from stops applying that day.
+    public boolean isUntouched() {
+        return status == ComplianceStatus.PENDING && !hasRecords();
+    }
+
     public boolean hasRecords() {
         return exercises.stream().anyMatch(SessionExercise::isRegistered);
     }

@@ -39,6 +39,11 @@ public class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     }
 
     @Override
+    public void delete(WorkoutSessionId id) {
+        jpaRepository.deleteById(id.value());
+    }
+
+    @Override
     public Optional<WorkoutSession> findByIdAndClientId(WorkoutSessionId id, ClientId clientId) {
         return jpaRepository.findByIdAndClientId(id.value(), clientId.value()).map(mapper::toDomain);
     }

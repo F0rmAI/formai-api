@@ -17,6 +17,8 @@ public interface WorkoutSessionRepository {
 
     WorkoutSession save(WorkoutSession session);
 
+    void delete(WorkoutSessionId id);
+
     Optional<WorkoutSession> findByIdAndClientId(WorkoutSessionId id, ClientId clientId);
 
     Optional<WorkoutSession> findByClientIdAndScheduledFor(ClientId clientId, LocalDate date);

@@ -41,13 +41,23 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
 
     @Override
     public Optional<WorkoutSession> handle(ScheduleWorkoutSessionCommand command) {
+        var activeRoutine = activeRoutineRepository.findByClientId(command.clientId())
+                .filter(candidate -> candidate.isActiveOn(command.date()));
         var existing = workoutSessionRepository.findByClientIdAndScheduledFor(command.clientId(), command.date());
         if (existing.isPresent()) {
-            return existing;
+            var session = existing.get();
+            var stillApplies = activeRoutine
+                    .map(routine -> routine.trainsOn(command.date())
+                            && routine.getRoutineId().equals(session.getRoutineId()))
+                    .orElse(false);
+            if (stillApplies || !session.isUntouched()) {
+                return existing;
+            }
+            // Scheduled from a routine that no longer applies that day (replaced, ended, or now a
+            // rest day) and never used: it is dropped so it does not end up SKIPPED.
+            workoutSessionRepository.delete(session.getId());
         }
-        var routine = activeRoutineRepository.findByClientId(command.clientId())
-                .filter(candidate -> candidate.isActiveOn(command.date()))
-                .orElseThrow(ActiveRoutineNotFoundException::new);
+        var routine = activeRoutine.orElseThrow(ActiveRoutineNotFoundException::new);
         if (!routine.trainsOn(command.date())) {
             return Optional.empty();   // a rest day: there is no session to schedule
         }
