@@ -19,10 +19,12 @@ import com.formai.api.iam.domain.model.entities.PasswordResetToken;
 import com.formai.api.iam.domain.model.events.AccountActivated;
 import com.formai.api.iam.domain.model.events.AccountLocked;
 import com.formai.api.iam.domain.model.events.ActivationCodeIssued;
+import com.formai.api.iam.domain.model.events.ClientAccountTransferred;
 import com.formai.api.iam.domain.model.events.PasswordResetRequested;
 import com.formai.api.iam.domain.model.events.UserRegistered;
 import com.formai.api.iam.domain.model.valueobjects.AccountStatus;
 import com.formai.api.iam.domain.model.valueobjects.HashedPassword;
+import com.formai.api.iam.domain.model.valueobjects.Role;
 import com.formai.api.iam.domain.repositories.UserRepository;
 import com.formai.api.iam.domain.services.UserCommandService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -115,26 +117,45 @@ public class UserCommandServiceImpl implements UserCommandService {
         var now = Instant.now();
         var user = userRepository.findByActivationCode(command.activationCode())
                 .orElseThrow(InvalidActivationCodeException::new);
+        // Accounts invited before the email was chosen on activation already hold one: reusing
+        // their own is a plain activation.
+        var existing = userRepository.findByEmail(command.email())
+                .filter(other -> !other.getId().equals(user.getId()));
+        if (existing.isPresent()) {
+            return Optional.of(transfer(user, existing.get(), command, now));
+        }
         var hashed = new HashedPassword(hashingService.hash(command.rawPassword()));
         user.activate(command, hashed, now);
-        // Checked after the code: only someone holding a valid code learns that an email is taken.
-        // Accounts invited before this rule already hold an email: reusing their own is allowed.
-        var takenByAnotherAccount = userRepository.findByEmail(command.email())
-                .filter(other -> !other.getId().equals(user.getId()))
-                .isPresent();
-        if (takenByAnotherAccount) {
-            throw new EmailAlreadyRegisteredException(command.email().value());
-        }
         var saved = userRepository.save(user);
 
         eventPublisher.publishEvent(new AccountActivated(saved.getId(), saved.getEmail().value(), now));
         return Optional.of(saved);
     }
 
+    // From the second redemption on: the email already has an account, so the client is joining
+    // another trainer (or coming back). The current password proves the account is theirs; without
+    // it the answer is the same "email taken" as before, and only after the code was validated,
+    // so nobody learns that an email exists without holding a valid code.
+    private User transfer(User invited, User existing, ActivateAccountCommand command, Instant now) {
+        invited.consumeInvitation(command, now);
+        var ownsTheAccount = existing.hasRole(Role.CLIENT)
+                && existing.getHashedPassword() != null
+                && hashingService.matches(command.rawPassword(), existing.getHashedPassword().value());
+        if (!ownsTheAccount) {
+            throw new EmailAlreadyRegisteredException(command.email().value());
+        }
+        existing.rejoin(command, now);
+        userRepository.save(invited);
+        var saved = userRepository.save(existing);
+
+        eventPublisher.publishEvent(new ClientAccountTransferred(invited.getId(), saved.getId(), now));
+        return saved;
+    }
+
     @Override
     public void handle(RequestPasswordResetCommand command) {
         userRepository.findByEmail(command.email())
-                .filter(user -> user.getStatus() == AccountStatus.ACTIVE)
+                .filter(User::canRequestPasswordReset)
                 .ifPresent(user -> {
                     var token = user.requestPasswordReset(Instant.now());
                     userRepository.save(user);
