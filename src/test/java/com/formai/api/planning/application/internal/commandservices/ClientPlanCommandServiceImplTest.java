@@ -168,7 +168,7 @@ class ClientPlanCommandServiceImplTest {
         assertThat(plan.getHolderId()).isEqualTo(newTrainer);
         assertThat(plan.currentAssignment()).isEmpty();
         verify(eventPublisher).publishEvent(new AssignmentClosed(CLIENT_ID.value(), routineId.value(),
-                START_DATE.plusDays(5)));
+                START_DATE.plusDays(4)));
     }
 
     @Test

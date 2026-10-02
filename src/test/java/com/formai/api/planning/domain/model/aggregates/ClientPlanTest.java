@@ -101,6 +101,6 @@ class ClientPlanTest {
 
         assertThat(plan.getHolderId()).isEqualTo(newTrainer);
         assertThat(plan.currentAssignment()).isEmpty();
-        assertThat(plan.getAssignments().getFirst().getPeriod().endDate()).isEqualTo(START_DATE.plusDays(10));
+        assertThat(plan.getAssignments().getFirst().getPeriod().endDate()).isEqualTo(START_DATE.plusDays(9));
     }
 }

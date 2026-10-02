@@ -126,4 +126,25 @@ class PlanningQueryServicesTest {
         assertThatThrownBy(() -> service.handle(new GetClientPlanQuery(CLIENT_ID, TRAINER_HOLDER_ID)))
                 .isInstanceOf(ClientAccessDeniedException.class);
     }
+
+    @Test
+    void shouldServeTheLatestAssignmentWhenTwoCoverToday() {
+        // Arrange: a routine assigned today is replaced the same day; both cover today
+        var first = routine();
+        var replacement = routine();
+        var today = LocalDate.now();
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(first.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today, TrainingDays.everyDay()));
+        plan.assign(new AssignRoutineCommand(replacement.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today, TrainingDays.everyDay()));
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+        when(routineRepository.findById(replacement.getId())).thenReturn(Optional.of(replacement));
+
+        // Act
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID));
+
+        // Assert
+        assertThat(active).hasValueSatisfying(assignment ->
+                assertThat(assignment.routine().getId()).isEqualTo(replacement.getId()));
+    }
 }
