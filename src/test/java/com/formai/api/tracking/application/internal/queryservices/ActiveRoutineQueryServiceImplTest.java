@@ -14,6 +14,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.DayOfWeek;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,7 +94,7 @@ class ActiveRoutineQueryServiceImplTest {
     void shouldNotShowARoutineBeforeItsStartDate() {
         when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.empty());
         when(externalPlanningService.fetchActiveRoutine(CLIENT_ID)).thenReturn(Optional.of(
-                new PlannedRoutine(ROUTINE_ID, "Next block", 1, TODAY.plusDays(3), plannedRoutine(1).days())));
+                new PlannedRoutine(ROUTINE_ID, "Next block", 1, TODAY.plusDays(3), EnumSet.allOf(DayOfWeek.class), plannedRoutine(1).days())));
 
         assertThatThrownBy(() -> queryService.handle(new GetActiveRoutineQuery(CLIENT_ID, TODAY)))
                 .isInstanceOf(ActiveRoutineNotFoundException.class);

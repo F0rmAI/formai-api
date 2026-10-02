@@ -8,7 +8,7 @@ import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.FinishWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.RecordSetCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
-import com.formai.api.tracking.domain.model.commands.SkipOverdueWorkoutSessionsCommand;
+import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.events.SetRecorded;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionFinished;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionScheduled;
@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -196,20 +197,23 @@ class WorkoutSessionCommandServiceImplTest {
     }
 
     @Test
-    void shouldSkipOnlyOverdueSessionsWithNothingRecorded() {
+    void shouldCloseOverdueSessionsAsSkippedOrPartial() {
         var untouched = pendingSession(TODAY.minusDays(1));
         var started = pendingSession(TODAY.minusDays(2));
         started.recordSet(recordSquat(started));
         when(workoutSessionRepository.findAllPendingBefore(TODAY)).thenReturn(List.of(untouched, started));
         savesReturnTheSession();
 
-        commandService.handle(new SkipOverdueWorkoutSessionsCommand(TODAY));
+        commandService.handle(new CloseOverdueWorkoutSessionsCommand(TODAY));
 
         assertThat(untouched.getStatus()).isEqualTo(ComplianceStatus.SKIPPED);
-        assertThat(started.getStatus()).isEqualTo(ComplianceStatus.PENDING);
+        assertThat(started.getStatus()).isEqualTo(ComplianceStatus.PARTIAL);
+        assertThat(started.getFinishedAt()).isNotNull();
         verify(workoutSessionRepository).save(untouched);
-        verify(workoutSessionRepository, never()).save(started);
+        verify(workoutSessionRepository).save(started);
         verify(eventPublisher).publishEvent(new WorkoutSessionSkipped(untouched.getId().value(), CLIENT_ID.value()));
+        verify(eventPublisher).publishEvent(new WorkoutSessionFinished(started.getId().value(), CLIENT_ID.value(),
+                "PARTIAL"));
     }
 
     @Test
@@ -219,5 +223,16 @@ class WorkoutSessionCommandServiceImplTest {
 
         assertThatThrownBy(() -> commandService.handle(new FinishWorkoutSessionCommand(id, CLIENT_ID, false)))
                 .isInstanceOf(WorkoutSessionNotFoundException.class);
+    }
+
+    @Test
+    void shouldNotScheduleASessionOnARestDay() {
+        var routine = activeRoutine();
+        routine.setTrainingDays(EnumSet.of(TODAY.plusDays(1).getDayOfWeek()));
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.empty());
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(routine));
+
+        assertThat(commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY))).isEmpty();
+        verify(workoutSessionRepository, never()).save(any(WorkoutSession.class));
     }
 }

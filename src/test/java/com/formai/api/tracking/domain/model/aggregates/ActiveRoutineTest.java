@@ -4,6 +4,9 @@ import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
 import org.junit.jupiter.api.Test;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -77,5 +80,17 @@ class ActiveRoutineTest {
         assertThat(routine.getVersion()).isEqualTo(2);
         assertThat(routine.getEndDate()).isNull();
         assertThat(routine.getDays()).extracting(RoutineDay::label).containsExactly("Day A · Legs", "Day B · Back");
+    }
+
+    @Test
+    void shouldTrainOnlyOnItsTrainingDaysWhileActive() {
+        var routine = activeRoutine();
+        routine.setTrainingDays(EnumSet.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY));
+        var monday = LocalDate.of(2026, 9, 28);
+
+        assertThat(routine.trainsOn(monday)).isTrue();
+        assertThat(routine.trainsOn(monday.plusDays(1))).isFalse();
+        assertThat(routine.trainsOn(monday.plusDays(2))).isTrue();
+        assertThat(routine.trainsOn(LocalDate.of(2026, 8, 31))).isFalse();   // a Monday before the start date
     }
 }

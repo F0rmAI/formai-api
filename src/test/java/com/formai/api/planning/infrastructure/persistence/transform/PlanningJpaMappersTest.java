@@ -5,6 +5,7 @@ import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
 import com.formai.api.planning.domain.model.valueobjects.RoutineStatus;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -69,9 +70,9 @@ class PlanningJpaMappersTest {
     @Test
     void shouldKeepTheAssignmentHistory() {
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE));
+        plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
         plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID,
-                START_DATE.plusDays(30)));
+                START_DATE.plusDays(30), TrainingDays.everyDay()));
 
         var restored = clientPlanMapper.toDomain(clientPlanMapper.toEntity(plan));
 

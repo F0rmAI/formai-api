@@ -1,19 +1,23 @@
 package com.formai.api.planning.application;
 
 import com.formai.api.clients.domain.model.events.ClientDeactivated;
+import com.formai.api.clients.domain.model.events.ClientTransferred;
 import com.formai.api.clients.interfaces.acl.ClientsContextFacade;
 import com.formai.api.planning.application.acl.PlanningContextFacadeImpl;
 import com.formai.api.planning.application.internal.eventhandlers.AssignmentClosedEventHandler;
 import com.formai.api.planning.application.internal.eventhandlers.ClientDeactivatedEventHandler;
+import com.formai.api.planning.application.internal.eventhandlers.ClientTransferredEventHandler;
 import com.formai.api.planning.application.internal.eventhandlers.RoutineAssignedEventHandler;
 import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
 import com.formai.api.planning.domain.model.commands.CloseRoutineCommand;
 import com.formai.api.planning.domain.model.commands.MarkRoutineActiveCommand;
+import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
 import com.formai.api.planning.domain.model.valueobjects.ActiveAssignment;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.services.ClientPlanCommandService;
 import com.formai.api.planning.domain.services.ClientPlanQueryService;
 import com.formai.api.planning.domain.services.RoutineCommandService;
@@ -54,7 +58,7 @@ class PlanningIntegrationPointsTest {
         // Arrange
         var routine = routine();
         when(clientPlanQueryService.handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)))
-                .thenReturn(Optional.of(new ActiveAssignment(CLIENT_ID, routine, START_DATE)));
+                .thenReturn(Optional.of(new ActiveAssignment(CLIENT_ID, routine, START_DATE, TrainingDays.everyDay())));
 
         // Act
         var snapshot = new PlanningContextFacadeImpl(clientPlanQueryService).fetchActiveRoutine(CLIENT_ID.value())
@@ -117,5 +121,15 @@ class PlanningIntegrationPointsTest {
                 .on(new AssignmentClosed(CLIENT_ID.value(), routine.getId().value(), START_DATE));
 
         verify(routineCommandService).handle(new CloseRoutineCommand(routine.getId()));
+    }
+
+    @Test
+    void shouldHandThePlanOverTodayWhenAClientChangesTrainer() {
+        var newTrainer = "33333333-3333-3333-3333-333333333333";
+
+        new ClientTransferredEventHandler(clientPlanCommandService)
+                .on(new ClientTransferred(CLIENT_ID.value(), TRAINER_HOLDER_ID, newTrainer));
+
+        verify(clientPlanCommandService).handle(new TransferClientPlanCommand(CLIENT_ID, newTrainer, LocalDate.now()));
     }
 }

@@ -14,6 +14,7 @@ import com.formai.api.tracking.domain.model.valueobjects.Reps;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 import static com.formai.api.tracking.TrackingTestData.BENCH_PRESS;
@@ -44,8 +45,12 @@ class WorkoutSessionTest {
     }
 
     private static void recordEveryExercise(WorkoutSession session) {
-        session.recordSet(recordSet(session, SQUAT, 1, "60", 10));
-        session.recordSet(recordSet(session, BENCH_PRESS, 1, "40", 8));
+        for (int set = 1; set <= SQUAT.sets(); set++) {
+            session.recordSet(recordSet(session, SQUAT, set, "60", 10));
+        }
+        for (int set = 1; set <= BENCH_PRESS.sets(); set++) {
+            session.recordSet(recordSet(session, BENCH_PRESS, set, "40", 8));
+        }
     }
 
     @Test
@@ -150,7 +155,7 @@ class WorkoutSessionTest {
     }
 
     @Test
-    void shouldFinishAsCompletedWhenEveryExerciseHasSets() {
+    void shouldFinishAsCompletedWhenEveryPrescribedSetIsRecorded() {
         var session = pendingSession(TODAY);
         recordEveryExercise(session);
 
@@ -189,7 +194,7 @@ class WorkoutSessionTest {
         recordEveryExercise(session);
         session.finish(finish(session, false));
 
-        assertThatThrownBy(() -> session.recordSet(recordSet(session, SQUAT, 2, "60", 10)))
+        assertThatThrownBy(() -> session.recordSet(recordSet(session, SQUAT, 1, "60", 10)))
                 .isInstanceOf(WorkoutSessionAlreadyFinishedException.class);
         assertThatThrownBy(() -> session.correctSet(correctSet(session, SQUAT, 1, "60", 10)))
                 .isInstanceOf(WorkoutSessionAlreadyFinishedException.class);
@@ -201,10 +206,47 @@ class WorkoutSessionTest {
     void shouldSkipAPendingSession() {
         var session = pendingSession(TODAY);
 
-        session.skip();
+        session.closeOverdue(Instant.now());
 
         assertThat(session.getStatus()).isEqualTo(ComplianceStatus.SKIPPED);
         assertThatThrownBy(() -> session.recordSet(recordSet(session, SQUAT, 1, "60", 10)))
                 .isInstanceOf(WorkoutSessionAlreadyFinishedException.class);
+    }
+
+    @Test
+    void shouldNotBeCompletedWhileAPrescribedSetIsMissing() {
+        var session = pendingSession(TODAY);
+        session.recordSet(recordSet(session, SQUAT, 1, "60", 10));
+        session.recordSet(recordSet(session, BENCH_PRESS, 1, "40", 8));
+
+        assertThatThrownBy(() -> session.finish(finish(session, false)))
+                .isInstanceOf(PartialFinishNotConfirmedException.class);
+        assertThat(session.finish(finish(session, true))).isEqualTo(ComplianceStatus.PARTIAL);
+    }
+
+    @Test
+    void shouldCloseAnOverdueSessionWithSomeRecordsAsPartial() {
+        var session = pendingSession(TODAY);
+        session.recordSet(recordSet(session, SQUAT, 1, "60", 10));
+        var closedAt = Instant.parse("2026-09-29T05:05:00Z");
+
+        assertThat(session.closeOverdue(closedAt)).isEqualTo(ComplianceStatus.PARTIAL);
+        assertThat(session.getFinishedAt()).isEqualTo(closedAt);
+    }
+
+    @Test
+    void shouldCloseAnOverdueSessionWithEverySetAsCompleted() {
+        var session = pendingSession(TODAY);
+        recordEveryExercise(session);
+
+        assertThat(session.closeOverdue(Instant.now())).isEqualTo(ComplianceStatus.COMPLETED);
+    }
+
+    @Test
+    void shouldCloseAnOverdueSessionWithoutRecordsAsSkippedWithNoFinishDate() {
+        var session = pendingSession(TODAY);
+
+        assertThat(session.closeOverdue(Instant.now())).isEqualTo(ComplianceStatus.SKIPPED);
+        assertThat(session.getFinishedAt()).isNull();
     }
 }

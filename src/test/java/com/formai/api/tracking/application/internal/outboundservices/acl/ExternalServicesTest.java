@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
@@ -42,7 +43,7 @@ class ExternalServicesTest {
         // Arrange
         var exerciseId = UUID.randomUUID();
         var snapshot = new ActiveRoutineSnapshot(CLIENT_ID.value(), ROUTINE_ID.value(), "Strength 12 weeks", 3,
-                START_DATE, List.of(new SessionSnapshot(1, "Day A · Legs", List.of(
+                START_DATE, Set.of("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"), List.of(new SessionSnapshot(1, "Day A · Legs", List.of(
                         new PrescribedExerciseSnapshot(exerciseId, "Squat", 4, 8, new BigDecimal("70"), 120)))));
         when(planningContextFacade.fetchActiveRoutine(CLIENT_ID.value())).thenReturn(Optional.of(snapshot));
 

@@ -7,6 +7,7 @@ import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
 import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
 import com.formai.api.planning.domain.model.queries.GetRoutineVersionsQuery;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class PlanningQueryServicesTest {
     void shouldReturnTheCurrentAssignmentWithItsRoutine() {
         var routine = routine();
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(routine.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE));
+        plan.assign(new AssignRoutineCommand(routine.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
         when(routineRepository.findById(routine.getId())).thenReturn(Optional.of(routine));
 
@@ -84,8 +85,8 @@ class PlanningQueryServicesTest {
         var previous = routine();
         var next = routine();
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(previous.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.minusDays(10)));
-        plan.assign(new AssignRoutineCommand(next.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.plusDays(5)));
+        plan.assign(new AssignRoutineCommand(previous.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.minusDays(10), TrainingDays.everyDay()));
+        plan.assign(new AssignRoutineCommand(next.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.plusDays(5), TrainingDays.everyDay()));
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
         when(routineRepository.findById(previous.getId())).thenReturn(Optional.of(previous));
 
@@ -99,7 +100,7 @@ class PlanningQueryServicesTest {
     @Test
     void shouldReturnNoActiveAssignmentOnceItIsClosed() {
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(routine().getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE));
+        plan.assign(new AssignRoutineCommand(routine().getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
         plan.closeCurrentAssignment(START_DATE.plusDays(3));
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
 

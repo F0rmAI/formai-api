@@ -3,15 +3,18 @@ package com.formai.api.clients.application;
 import com.formai.api.clients.application.acl.ClientsContextFacadeImpl;
 import com.formai.api.clients.application.internal.commandservices.TrainerCommandServiceImpl;
 import com.formai.api.clients.application.internal.eventhandlers.AccountActivatedEventHandler;
+import com.formai.api.clients.application.internal.eventhandlers.ClientAccountTransferredEventHandler;
 import com.formai.api.clients.application.internal.eventhandlers.UserRegisteredEventHandler;
 import com.formai.api.clients.application.internal.outboundservices.acl.ExternalIamService;
 import com.formai.api.clients.application.internal.queryservices.ClientQueryServiceImpl;
 import com.formai.api.clients.domain.model.aggregates.Trainer;
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.commands.RegisterTrainerCommand;
+import com.formai.api.clients.domain.model.commands.TransferClientCommand;
 import com.formai.api.clients.domain.model.queries.GetClientByIdQuery;
 import com.formai.api.clients.domain.model.queries.GetClientProfileQuery;
 import com.formai.api.clients.domain.model.queries.GetClientsQuery;
+import com.formai.api.clients.domain.model.valueobjects.ClientId;
 import com.formai.api.clients.domain.model.valueobjects.ClientPage;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
 import com.formai.api.clients.domain.model.valueobjects.Email;
@@ -23,6 +26,7 @@ import com.formai.api.clients.domain.services.ClientCommandService;
 import com.formai.api.clients.domain.services.ClientQueryService;
 import com.formai.api.clients.domain.services.TrainerCommandService;
 import com.formai.api.iam.domain.model.events.AccountActivated;
+import com.formai.api.iam.domain.model.events.ClientAccountTransferred;
 import com.formai.api.iam.domain.model.events.UserRegistered;
 import com.formai.api.iam.interfaces.acl.IamContextFacade;
 import com.formai.api.shared.contracts.clients.ClientListRequest;
@@ -180,6 +184,16 @@ class ClientsIntegrationPointsTest {
                 .on(new AccountActivated(CLIENT_ID.value(), "luis@formai.com", Instant.now()));
 
         verify(clientCommandService).handle(new ActivateClientCommand(CLIENT_ID, CLIENT_EMAIL));
+    }
+
+    @Test
+    void shouldTransferTheClientWhenTheirAccountMovesToANewTrainer() {
+        var invitedUserId = UUID.randomUUID();
+
+        new ClientAccountTransferredEventHandler(clientCommandService)
+                .on(new ClientAccountTransferred(invitedUserId, CLIENT_ID.value(), Instant.now()));
+
+        verify(clientCommandService).handle(new TransferClientCommand(new ClientId(invitedUserId), CLIENT_ID));
     }
 
     @Test
