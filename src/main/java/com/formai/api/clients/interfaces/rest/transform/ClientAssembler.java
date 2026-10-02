@@ -22,6 +22,7 @@ import com.formai.api.clients.interfaces.rest.resources.ActivationCodeResource;
 import com.formai.api.clients.interfaces.rest.resources.BodyProfileResource;
 import com.formai.api.clients.interfaces.rest.resources.BodyWeightRecordResource;
 import com.formai.api.clients.interfaces.rest.resources.ClientPageResource;
+import com.formai.api.clients.interfaces.rest.resources.ClientProfileResource;
 import com.formai.api.clients.interfaces.rest.resources.ClientResource;
 import com.formai.api.clients.interfaces.rest.resources.RegisterClientResource;
 import com.formai.api.clients.interfaces.rest.resources.RegisteredClientResource;
@@ -43,12 +44,13 @@ public interface ClientAssembler {
 
     ClientResource toResource(Client client);
 
+    ClientProfileResource toProfileResource(Client client);
+
     @Mapping(target = "content", source = "items")
     ClientPageResource toResource(ClientPage page);
 
     @Mapping(target = "id", source = "client.id")
     @Mapping(target = "fullName", source = "client.fullName")
-    @Mapping(target = "email", source = "client.email")
     @Mapping(target = "status", source = "client.status")
     @Mapping(target = "activationCode", source = "ticket.code")
     @Mapping(target = "activationCodeExpiresAt", source = "ticket.expiresAt")
@@ -66,7 +68,6 @@ public interface ClientAssembler {
 
     @Mapping(target = "holderId", source = "holderId")
     @Mapping(target = "fullName", source = "resource.fullName")
-    @Mapping(target = "email", source = "resource.email")
     RegisterClientCommand toCommand(String holderId, RegisterClientResource resource);
 
     @Mapping(target = "clientId", source = "clientId")

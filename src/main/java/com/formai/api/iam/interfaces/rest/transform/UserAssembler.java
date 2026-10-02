@@ -44,6 +44,7 @@ public interface UserAssembler {
     SignInCommand toCommand(SignInResource resource);
 
     @Mapping(target = "activationCode", source = "resource.activationCode")
+    @Mapping(target = "email", source = "resource.email")
     @Mapping(target = "rawPassword", source = "resource.password")
     @Mapping(target = "consentAccepted", source = "resource.consentAccepted")
     @Mapping(target = "consentVersion", source = "resource.consentVersion")

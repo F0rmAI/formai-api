@@ -1,6 +1,7 @@
 package com.formai.api.iam.interfaces.rest;
 
 import com.formai.api.iam.domain.exceptions.ConsentRequiredException;
+import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.exceptions.InvalidActivationCodeException;
 import com.formai.api.iam.domain.model.aggregates.User;
 import com.formai.api.iam.domain.model.commands.ActivateAccountCommand;
@@ -36,8 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountActivationsControllerTest {
 
     private static final String BODY =
-            "{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\",\"consentAccepted\":true,"
-                    + "\"consentVersion\":\"1.0\"}";
+            "{\"activationCode\":\"ABCD2345\",\"email\":\"Client@FormAI.com\",\"password\":\"secret123\","
+                    + "\"consentAccepted\":true,\"consentVersion\":\"1.0\"}";
 
     @Autowired
     MockMvc mockMvc;
@@ -50,13 +51,13 @@ class AccountActivationsControllerTest {
 
     private void commandIsAssembled() {
         when(assembler.toCommand(any(CreateAccountActivationResource.class)))
-                .thenReturn(new ActivateAccountCommand("ABCD2345", "secret123", true, "1.0"));
+                .thenReturn(new ActivateAccountCommand("ABCD2345", new Email("client@formai.com"), "secret123", true, "1.0"));
     }
 
     @Test
     void shouldReturn201WhenAccountIsActivated() throws Exception {
         // Arrange
-        var client = User.createPendingClient(new CreateClientAccountCommand(new Email("client@formai.com")), Instant.now());
+        var client = User.createPendingClient(new CreateClientAccountCommand(), Instant.now());
         commandIsAssembled();
         when(userCommandService.handle(any(ActivateAccountCommand.class))).thenReturn(Optional.of(client));
         when(assembler.toActivationResource(client))
@@ -71,16 +72,39 @@ class AccountActivationsControllerTest {
     @Test
     void shouldReturn400WhenActivationCodeIsBlank() throws Exception {
         mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activationCode\":\"\",\"password\":\"secret123\",\"consentAccepted\":true,"
-                                + "\"consentVersion\":\"1.0\"}"))
+                        .content("{\"activationCode\":\"\",\"email\":\"client@formai.com\",\"password\":\"secret123\","
+                                + "\"consentAccepted\":true,\"consentVersion\":\"1.0\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldReturn400WhenConsentVersionIsMissing() throws Exception {
         mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\",\"consentAccepted\":true}"))
+                        .content("{\"activationCode\":\"ABCD2345\",\"email\":\"client@formai.com\","
+                                + "\"password\":\"secret123\",\"consentAccepted\":true}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400WhenEmailIsMissingOrMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"activationCode\":\"ABCD2345\",\"password\":\"secret123\","
+                                + "\"consentAccepted\":true,\"consentVersion\":\"1.0\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"activationCode\":\"ABCD2345\",\"email\":\"client@formai\","
+                                + "\"password\":\"secret123\",\"consentAccepted\":true,\"consentVersion\":\"1.0\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn409WhenEmailBelongsToAnotherAccount() throws Exception {
+        commandIsAssembled();
+        when(userCommandService.handle(any(ActivateAccountCommand.class)))
+                .thenThrow(new EmailAlreadyRegisteredException("client@formai.com"));
+
+        mockMvc.perform(post("/api/v1/account-activations").contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isConflict());
     }
 
     @Test

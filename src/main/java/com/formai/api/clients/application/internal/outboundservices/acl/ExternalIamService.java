@@ -20,8 +20,8 @@ public class ExternalIamService {
         this.iamContextFacade = iamContextFacade;
     }
 
-    public Optional<ActivationTicket> createClientAccount(Email email) {
-        return iamContextFacade.createClientAccount(email.value()).map(this::toTicket);
+    public Optional<ActivationTicket> createClientAccount() {
+        return iamContextFacade.createClientAccount().map(this::toTicket);
     }
 
     public Optional<ActivationTicket> renewActivationCode(ClientId clientId) {
@@ -32,8 +32,10 @@ public class ExternalIamService {
         return iamContextFacade.disableAccount(clientId.value());
     }
 
-    public boolean isAccountActive(ClientId clientId) {
-        return iamContextFacade.fetchAccountStatus(clientId.value()).map(ACTIVE::equals).orElse(false);
+    // The email of the account once the client has activated it; empty while it is still pending.
+    public Optional<Email> fetchActivatedEmail(ClientId clientId) {
+        var active = iamContextFacade.fetchAccountStatus(clientId.value()).map(ACTIVE::equals).orElse(false);
+        return active ? iamContextFacade.fetchAccountEmail(clientId.value()).map(Email::new) : Optional.empty();
     }
 
     private ActivationTicket toTicket(AccountActivationSummary summary) {

@@ -40,7 +40,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/routines/**",
                                 "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
                         .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**",
-                                "/api/v1/progress-charts/**").hasAuthority("ROLE_CLIENT")
+                                "/api/v1/progress-charts/**", "/api/v1/client-profiles/**")
+                        .hasAuthority("ROLE_CLIENT")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

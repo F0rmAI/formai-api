@@ -18,11 +18,17 @@ public class JwtCookieFactory {
 
     private final long expirationMinutes;
     private final long refreshExpirationDays;
+    private final boolean secure;
 
+    // secure is true everywhere except local development over plain HTTP: the mobile app's
+    // network stack (iOS and Android) never sends a Secure cookie to http://localhost, so
+    // without this switch a client could sign in but every later call would arrive without a session.
     public JwtCookieFactory(@Value("${formai.jwt.expiration-minutes:30}") long expirationMinutes,
-                            @Value("${formai.jwt.refresh-expiration-days:7}") long refreshExpirationDays) {
+                            @Value("${formai.jwt.refresh-expiration-days:7}") long refreshExpirationDays,
+                            @Value("${formai.jwt.cookie-secure:true}") boolean secure) {
         this.expirationMinutes = expirationMinutes;
         this.refreshExpirationDays = refreshExpirationDays;
+        this.secure = secure;
     }
 
     public ResponseCookie issue(String token) {
@@ -44,7 +50,7 @@ public class JwtCookieFactory {
     private ResponseCookie build(String name, String value, String path, Duration maxAge) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
+                .secure(secure)
                 .sameSite("Lax")
                 .path(path)
                 .maxAge(maxAge)

@@ -2,8 +2,6 @@ package com.formai.api.clients.application.internal.commandservices;
 
 import com.formai.api.clients.application.internal.outboundservices.acl.ExternalIamService;
 import com.formai.api.clients.domain.exceptions.ActivationCodeNotRenewableException;
-import com.formai.api.clients.domain.exceptions.ClientAlreadyRegisteredException;
-import com.formai.api.clients.domain.exceptions.ClientEmailUnavailableException;
 import com.formai.api.clients.domain.exceptions.ClientNotFoundException;
 import com.formai.api.clients.domain.model.aggregates.Client;
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
@@ -70,8 +68,7 @@ class ClientCommandServiceImplTest {
     @Test
     void shouldRegisterAnInvitedClientWithItsActivationCode() {
         // Arrange
-        when(clientRepository.existsByHolderIdAndEmail(TRAINER_HOLDER_ID, CLIENT_EMAIL)).thenReturn(false);
-        when(externalIamService.createClientAccount(CLIENT_EMAIL)).thenReturn(Optional.of(ticket()));
+        when(externalIamService.createClientAccount()).thenReturn(Optional.of(ticket()));
         savesReturnTheClient();
 
         // Act
@@ -80,27 +77,20 @@ class ClientCommandServiceImplTest {
         // Assert
         assertThat(registered.client().getId()).isEqualTo(CLIENT_ID);
         assertThat(registered.client().getStatus()).isEqualTo(ClientStatus.INVITED);
+        assertThat(registered.client().getEmail()).isNull();
         assertThat(registered.ticket().code()).isEqualTo("ABCD2345");
         verify(eventPublisher).publishEvent(new ClientRegistered(CLIENT_ID.value(), TRAINER_HOLDER_ID));
     }
 
     @Test
-    void shouldRejectAClientAlreadyInTheTrainersList() {
-        when(clientRepository.existsByHolderIdAndEmail(TRAINER_HOLDER_ID, CLIENT_EMAIL)).thenReturn(true);
+    void shouldRegisterTwoClientsWithTheSameNameSinceNoEmailTellsThemApart() {
+        when(externalIamService.createClientAccount()).thenReturn(Optional.of(ticket()));
+        savesReturnTheClient();
 
-        assertThatThrownBy(() -> commandService.handle(registerCommand()))
-                .isInstanceOf(ClientAlreadyRegisteredException.class);
-        verify(externalIamService, never()).createClientAccount(any());
-    }
+        commandService.handle(registerCommand());
+        commandService.handle(registerCommand());
 
-    @Test
-    void shouldRejectAnEmailThatBelongsToAnotherAccount() {
-        when(clientRepository.existsByHolderIdAndEmail(TRAINER_HOLDER_ID, CLIENT_EMAIL)).thenReturn(false);
-        when(externalIamService.createClientAccount(CLIENT_EMAIL)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> commandService.handle(registerCommand()))
-                .isInstanceOf(ClientEmailUnavailableException.class);
-        verify(clientRepository, never()).save(any());
+        verify(clientRepository, org.mockito.Mockito.times(2)).save(any());
     }
 
     @Test
@@ -137,9 +127,10 @@ class ClientCommandServiceImplTest {
         when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(client));
         savesReturnTheClient();
 
-        commandService.handle(new ActivateClientCommand(CLIENT_ID));
+        commandService.handle(new ActivateClientCommand(CLIENT_ID, CLIENT_EMAIL));
 
         assertThat(client.getStatus()).isEqualTo(ClientStatus.ACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
         verify(eventPublisher).publishEvent(new ClientActivated(CLIENT_ID.value()));
     }
 
@@ -147,13 +138,14 @@ class ClientCommandServiceImplTest {
     void shouldCatchUpWithALostActivationBeforeATrainerWrite() {
         var client = invitedClient();
         trainerOwns(client);
-        when(externalIamService.isAccountActive(CLIENT_ID)).thenReturn(true);
+        when(externalIamService.fetchActivatedEmail(CLIENT_ID)).thenReturn(Optional.of(CLIENT_EMAIL));
         savesReturnTheClient();
 
         var renamed = commandService.handle(new UpdateClientCommand(CLIENT_ID, TRAINER_HOLDER_ID,
                 new FullName("Luis R."))).orElseThrow();
 
         assertThat(renamed.getStatus()).isEqualTo(ClientStatus.ACTIVE);
+        assertThat(renamed.getEmail()).isEqualTo(CLIENT_EMAIL);
         assertThat(renamed.getFullName().value()).isEqualTo("Luis R.");
         verify(eventPublisher).publishEvent(new ClientActivated(CLIENT_ID.value()));
     }

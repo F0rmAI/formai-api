@@ -1,8 +1,6 @@
 package com.formai.api.clients.interfaces.rest;
 
 import com.formai.api.clients.domain.exceptions.ActivationCodeNotRenewableException;
-import com.formai.api.clients.domain.exceptions.ClientAlreadyRegisteredException;
-import com.formai.api.clients.domain.exceptions.ClientEmailUnavailableException;
 import com.formai.api.clients.domain.model.commands.DeactivateClientCommand;
 import com.formai.api.clients.domain.model.commands.RegisterClientCommand;
 import com.formai.api.clients.domain.model.commands.RenewActivationCodeCommand;
@@ -56,7 +54,7 @@ class ClientsControllerTest {
 
     private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
 
-    private static final String LUIS_BODY = "{\"fullName\":\"Luis Ramos\",\"email\":\"Luis@FormAI.com\"}";
+    private static final String LUIS_BODY = "{\"fullName\":\"Luis Ramos\"}";
     private static final String PROFILE_BODY =
             "{\"goal\":\"Hypertrophy\",\"heightCm\":%d,\"weightKg\":%s,\"restrictions\":\"Left knee injury\"}";
 
@@ -72,43 +70,25 @@ class ClientsControllerTest {
     @Test
     void shouldReturn201WithTheActivationCodeOnScreen() throws Exception {
         when(clientCommandService.handle(argThat((RegisterClientCommand command) ->
-                command.holderId().equals(TRAINER_HOLDER_ID) && command.email().value().equals("luis@formai.com"))))
+                command.holderId().equals(TRAINER_HOLDER_ID) && command.fullName().value().equals("Luis Ramos"))))
                 .thenReturn(Optional.of(new RegisteredClient(invitedClient(), ticket())));
 
         mockMvc.perform(post("/api/v1/clients").contentType(MediaType.APPLICATION_JSON).content(LUIS_BODY).with(TRAINER))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(CLIENT_ID.value().toString()))
                 .andExpect(jsonPath("$.status").value("INVITED"))
+                .andExpect(jsonPath("$.email").doesNotExist())
                 .andExpect(jsonPath("$.activationCode").value("ABCD2345"))
                 .andExpect(jsonPath("$.activationCodeExpiresAt").value("2026-10-04T12:00:00Z"));
     }
 
     @Test
-    void shouldReturn400ForAnInvalidEmail() throws Exception {
+    void shouldReturn400WhenTheNameIsMissing() throws Exception {
         mockMvc.perform(post("/api/v1/clients").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"fullName\":\"Luis Ramos\",\"email\":\"luis@formai\"}").with(TRAINER))
+                        .content("{\"fullName\":\"\"}").with(TRAINER))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(clientCommandService);
-    }
-
-    @Test
-    void shouldReturn409ForAClientAlreadyInTheList() throws Exception {
-        when(clientCommandService.handle(any(RegisterClientCommand.class)))
-                .thenThrow(new ClientAlreadyRegisteredException("luis@formai.com"));
-
-        mockMvc.perform(post("/api/v1/clients").contentType(MediaType.APPLICATION_JSON).content(LUIS_BODY).with(TRAINER))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    void shouldReturn409ForAnEmailThatIsNotAvailable() throws Exception {
-        when(clientCommandService.handle(any(RegisterClientCommand.class)))
-                .thenThrow(new ClientEmailUnavailableException());
-
-        mockMvc.perform(post("/api/v1/clients").contentType(MediaType.APPLICATION_JSON).content(LUIS_BODY).with(TRAINER))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("This email is not available"));
     }
 
     @Test

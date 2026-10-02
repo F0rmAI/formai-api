@@ -22,7 +22,8 @@ public class UserJpaEntity {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 320)
+    // Null while a client account is pending activation.
+    @Column(unique = true, length = 320)
     private String email;
 
     @Column(name = "hashed_password")

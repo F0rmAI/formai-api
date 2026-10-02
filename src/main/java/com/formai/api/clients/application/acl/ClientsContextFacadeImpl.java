@@ -46,7 +46,9 @@ public class ClientsContextFacadeImpl implements ClientsContextFacade {
     }
 
     private ClientSummary toSummary(Client client) {
-        return new ClientSummary(client.getId().value(), client.getFullName().value(), client.getEmail().value(),
+        // The email is empty until the client activates the account.
+        var email = client.getEmail() == null ? null : client.getEmail().value();
+        return new ClientSummary(client.getId().value(), client.getFullName().value(), email,
                 client.getStatus().name());
     }
 

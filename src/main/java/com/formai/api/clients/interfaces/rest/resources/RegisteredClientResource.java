@@ -5,7 +5,6 @@ import java.util.UUID;
 
 public record RegisteredClientResource(UUID id,
                                        String fullName,
-                                       String email,
                                        String status,
                                        String activationCode,
                                        Instant activationCodeExpiresAt) { }

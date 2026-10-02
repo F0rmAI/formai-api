@@ -14,7 +14,7 @@ public final class ApiTags {
     public static final String CLIENTS = "Clients";
     public static final String CLIENTS_DESCRIPTION = "Trainer (web): register clients and renew their activation "
             + "code, list them with their current routine and last workout, rename or deactivate them, and keep "
-            + "their body profile.";
+            + "their body profile. Client (mobile app): own name and email.";
 
     public static final String EXERCISES = "Exercises";
     public static final String EXERCISES_DESCRIPTION = "Trainer (web): own catalog of reusable exercises, archive "

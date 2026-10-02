@@ -50,14 +50,6 @@ class ClientRepositoryImplTest {
     }
 
     @Test
-    void shouldCheckDuplicatesByTheNormalizedEmail() {
-        when(jpaRepository.existsByHolderIdAndEmail(TRAINER_HOLDER_ID, "luis@formai.com")).thenReturn(true);
-
-        assertThat(new ClientRepositoryImpl(jpaRepository, mapper).existsByHolderIdAndEmail(TRAINER_HOLDER_ID,
-                CLIENT_EMAIL)).isTrue();
-    }
-
-    @Test
     void shouldListTheTrainersClientsSortedByName() {
         var entity = mapper.toEntity(activeClient());
         when(jpaRepository.findAllByHolderId(eq(TRAINER_HOLDER_ID), eq(Optional.of("lu")), eq(Optional.of("ACTIVE")),

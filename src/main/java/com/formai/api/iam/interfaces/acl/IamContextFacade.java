@@ -7,11 +7,13 @@ import java.util.UUID;
 
 public interface IamContextFacade {
 
-    Optional<AccountActivationSummary> createClientAccount(String email);
+    Optional<AccountActivationSummary> createClientAccount();
 
     Optional<AccountActivationSummary> reissueActivationCode(UUID userId);
 
     boolean disableAccount(UUID userId);
 
     Optional<String> fetchAccountStatus(UUID userId);
+
+    Optional<String> fetchAccountEmail(UUID userId);
 }

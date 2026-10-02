@@ -1,6 +1,5 @@
 package com.formai.api.iam.application.acl;
 
-import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.model.aggregates.User;
 import com.formai.api.iam.domain.model.commands.CreateClientAccountCommand;
 import com.formai.api.iam.domain.model.commands.DisableAccountCommand;
@@ -33,13 +32,9 @@ public class IamContextFacadeImpl implements IamContextFacade {
     }
 
     @Override
-    public Optional<AccountActivationSummary> createClientAccount(String email) {
-        try {
-            return userCommandService.handle(new CreateClientAccountCommand(new Email(email)))
-                    .map(this::toActivationSummary);
-        } catch (EmailAlreadyRegisteredException e) {
-            return Optional.empty();
-        }
+    public Optional<AccountActivationSummary> createClientAccount() {
+        return userCommandService.handle(new CreateClientAccountCommand())
+                .map(this::toActivationSummary);
     }
 
     @Override
@@ -63,6 +58,14 @@ public class IamContextFacadeImpl implements IamContextFacade {
     public Optional<String> fetchAccountStatus(UUID userId) {
         return userQueryService.handle(new GetUserByIdQuery(userId))
                 .map(user -> user.getStatus().name());
+    }
+
+    // Empty while the account is pending: the client chooses the email on activation.
+    @Override
+    public Optional<String> fetchAccountEmail(UUID userId) {
+        return userQueryService.handle(new GetUserByIdQuery(userId))
+                .flatMap(user -> Optional.ofNullable(user.getEmail()))
+                .map(Email::value);
     }
 
     private AccountActivationSummary toActivationSummary(User user) {

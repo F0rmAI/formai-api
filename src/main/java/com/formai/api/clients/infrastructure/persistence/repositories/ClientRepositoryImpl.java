@@ -4,7 +4,6 @@ import com.formai.api.clients.domain.model.aggregates.Client;
 import com.formai.api.clients.domain.model.valueobjects.ClientId;
 import com.formai.api.clients.domain.model.valueobjects.ClientPage;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
-import com.formai.api.clients.domain.model.valueobjects.Email;
 import com.formai.api.clients.domain.model.valueobjects.Pagination;
 import com.formai.api.clients.domain.repositories.ClientRepository;
 import com.formai.api.clients.infrastructure.persistence.transform.ClientJpaMapper;
@@ -42,11 +41,6 @@ public class ClientRepositoryImpl implements ClientRepository {
     @Override
     public Optional<Client> findById(ClientId id) {
         return jpaRepository.findById(id.value()).map(mapper::toDomain);
-    }
-
-    @Override
-    public boolean existsByHolderIdAndEmail(String holderId, Email email) {
-        return jpaRepository.existsByHolderIdAndEmail(holderId, email.value());
     }
 
     @Override

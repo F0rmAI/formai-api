@@ -61,14 +61,13 @@ public class ClientsController {
     }
 
     @Operation(summary = "Register a client",
-            description = "Creates the client as INVITED and returns a 72-hour activation code to share by hand.")
+            description = "Creates the client as INVITED, with the name only, and returns a 72-hour activation " +
+                    "code to share by hand. The client chooses the email when activating the account.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Client registered, with the activation code",
                     content = @Content(schema = @Schema(implementation = RegisteredClientResource.class))),
-            @ApiResponse(responseCode = "400", description = "Missing name, or an invalid email", content = @Content),
+            @ApiResponse(responseCode = "400", description = "Missing name", content = @Content),
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer",
-                    content = @Content),
-            @ApiResponse(responseCode = "409", description = "Already one of your clients, or the email is not available",
                     content = @Content)
     })
     @PostMapping

@@ -91,9 +91,6 @@ public class UserCommandServiceImpl implements UserCommandService {
 
     @Override
     public Optional<User> handle(CreateClientAccountCommand command) {
-        if (userRepository.existsByEmail(command.email())) {
-            throw new EmailAlreadyRegisteredException(command.email().value());
-        }
         var user = User.createPendingClient(command, Instant.now());
         var saved = userRepository.save(user);
 
@@ -120,9 +117,17 @@ public class UserCommandServiceImpl implements UserCommandService {
                 .orElseThrow(InvalidActivationCodeException::new);
         var hashed = new HashedPassword(hashingService.hash(command.rawPassword()));
         user.activate(command, hashed, now);
+        // Checked after the code: only someone holding a valid code learns that an email is taken.
+        // Accounts invited before this rule already hold an email: reusing their own is allowed.
+        var takenByAnotherAccount = userRepository.findByEmail(command.email())
+                .filter(other -> !other.getId().equals(user.getId()))
+                .isPresent();
+        if (takenByAnotherAccount) {
+            throw new EmailAlreadyRegisteredException(command.email().value());
+        }
         var saved = userRepository.save(user);
 
-        eventPublisher.publishEvent(new AccountActivated(saved.getId(), now));
+        eventPublisher.publishEvent(new AccountActivated(saved.getId(), saved.getEmail().value(), now));
         return Optional.of(saved);
     }
 

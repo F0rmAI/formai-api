@@ -34,13 +34,15 @@ public class AccountActivationsController {
     }
 
     @Operation(summary = "Activate a client account",
-            description = "Redeems a valid activation code, sets the client's password and records the " +
-                    "personal data processing consent. The account becomes ACTIVE and can sign in from " +
+            description = "Redeems a valid activation code, sets the email the client will sign in with and " +
+                    "the password, and records the personal data processing consent. The account becomes ACTIVE and can sign in from " +
                     "the mobile app.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Account activated",
                     content = @Content(schema = @Schema(implementation = AccountActivationResource.class))),
-            @ApiResponse(responseCode = "400", description = "Blank activation code or password",
+            @ApiResponse(responseCode = "400", description = "Blank activation code or password, or a missing " +
+                    "or malformed email", content = @Content),
+            @ApiResponse(responseCode = "409", description = "An account with this email already exists",
                     content = @Content),
             @ApiResponse(responseCode = "422", description = "Invalid, expired or used activation code, consent " +
                     "not accepted, or password not between 8 and 128 characters long",

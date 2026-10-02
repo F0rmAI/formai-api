@@ -2,8 +2,6 @@ package com.formai.api.clients.application.internal.commandservices;
 
 import com.formai.api.clients.application.internal.outboundservices.acl.ExternalIamService;
 import com.formai.api.clients.domain.exceptions.ActivationCodeNotRenewableException;
-import com.formai.api.clients.domain.exceptions.ClientAlreadyRegisteredException;
-import com.formai.api.clients.domain.exceptions.ClientEmailUnavailableException;
 import com.formai.api.clients.domain.exceptions.ClientNotFoundException;
 import com.formai.api.clients.domain.model.aggregates.Client;
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
@@ -20,6 +18,7 @@ import com.formai.api.clients.domain.model.events.ClientRegistered;
 import com.formai.api.clients.domain.model.valueobjects.ActivationTicket;
 import com.formai.api.clients.domain.model.valueobjects.ClientId;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
+import com.formai.api.clients.domain.model.valueobjects.Email;
 import com.formai.api.clients.domain.model.valueobjects.RegisteredClient;
 import com.formai.api.clients.domain.repositories.ClientRepository;
 import com.formai.api.clients.domain.services.ClientCommandService;
@@ -48,11 +47,8 @@ public class ClientCommandServiceImpl implements ClientCommandService {
     @Override
     @Transactional
     public Optional<RegisteredClient> handle(RegisterClientCommand command) {
-        if (clientRepository.existsByHolderIdAndEmail(command.holderId(), command.email())) {
-            throw new ClientAlreadyRegisteredException(command.email().value());
-        }
-        var ticket = externalIamService.createClientAccount(command.email())
-                .orElseThrow(ClientEmailUnavailableException::new);
+        var ticket = externalIamService.createClientAccount()
+                .orElseThrow(() -> new IllegalStateException("Creating a client account should never return empty"));
         var saved = clientRepository.save(Client.register(command, ticket));
 
         eventPublisher.publishEvent(new ClientRegistered(saved.getId().value(), saved.getHolderId()));
@@ -84,7 +80,7 @@ public class ClientCommandServiceImpl implements ClientCommandService {
     public void handle(ActivateClientCommand command) {
         clientRepository.findById(command.clientId())
                 .filter(client -> client.getStatus() == ClientStatus.INVITED)
-                .ifPresent(this::activate);
+                .ifPresent(client -> activate(client, command.email()));
     }
 
     @Override
@@ -121,14 +117,14 @@ public class ClientCommandServiceImpl implements ClientCommandService {
     private Client findOwnClient(ClientId clientId, String holderId) {
         var client = clientRepository.findByIdAndHolderId(clientId, holderId)
                 .orElseThrow(ClientNotFoundException::new);
-        if (client.canRenewActivationCode() && externalIamService.isAccountActive(client.getId())) {
-            activate(client);
+        if (client.canRenewActivationCode()) {
+            externalIamService.fetchActivatedEmail(client.getId()).ifPresent(email -> activate(client, email));
         }
         return client;
     }
 
-    private void activate(Client client) {
-        client.activate();
+    private void activate(Client client, Email email) {
+        client.activate(email);
         clientRepository.save(client);
         eventPublisher.publishEvent(new ClientActivated(client.getId().value()));
     }

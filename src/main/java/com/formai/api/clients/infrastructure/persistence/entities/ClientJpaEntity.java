@@ -31,7 +31,8 @@ public class ClientJpaEntity {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
-    @Column(name = "email", nullable = false, length = 254)
+    // Null until the client activates the account and chooses the email.
+    @Column(name = "email", length = 254)
     private String email;
 
     // Stored as a plain string, not the domain ClientStatus type: this entity stays

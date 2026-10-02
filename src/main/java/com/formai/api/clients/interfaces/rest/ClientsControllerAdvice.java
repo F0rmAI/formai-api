@@ -1,8 +1,6 @@
 package com.formai.api.clients.interfaces.rest;
 
 import com.formai.api.clients.domain.exceptions.ActivationCodeNotRenewableException;
-import com.formai.api.clients.domain.exceptions.ClientAlreadyRegisteredException;
-import com.formai.api.clients.domain.exceptions.ClientEmailUnavailableException;
 import com.formai.api.clients.domain.exceptions.ClientNotFoundException;
 import com.formai.api.clients.domain.exceptions.InvalidBodyProfileException;
 import org.springframework.core.Ordered;
@@ -13,18 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = ClientsController.class)
+@RestControllerAdvice(assignableTypes = {ClientsController.class, ClientProfilesController.class})
 public class ClientsControllerAdvice {
-
-    @ExceptionHandler(ClientAlreadyRegisteredException.class)
-    public ProblemDetail handleClientAlreadyRegistered(ClientAlreadyRegisteredException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-    }
-
-    @ExceptionHandler(ClientEmailUnavailableException.class)
-    public ProblemDetail handleClientEmailUnavailable(ClientEmailUnavailableException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
-    }
 
     @ExceptionHandler(ClientNotFoundException.class)
     public ProblemDetail handleClientNotFound(ClientNotFoundException ex) {
