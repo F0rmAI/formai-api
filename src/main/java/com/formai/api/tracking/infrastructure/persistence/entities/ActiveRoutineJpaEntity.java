@@ -33,6 +33,10 @@ public class ActiveRoutineJpaEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    // Comma-separated java.time.DayOfWeek names, e.g. MONDAY,WEDNESDAY,FRIDAY.
+    @Column(name = "training_days", nullable = false, length = 70)
+    private String trainingDays;
+
     @Column(name = "days_json", nullable = false, columnDefinition = "text")
     private String daysJson;
 
@@ -102,5 +106,13 @@ public class ActiveRoutineJpaEntity {
 
     public void setDaysJson(String daysJson) {
         this.daysJson = daysJson;
+    }
+
+    public String getTrainingDays() {
+        return trainingDays;
+    }
+
+    public void setTrainingDays(String trainingDays) {
+        this.trainingDays = trainingDays;
     }
 }

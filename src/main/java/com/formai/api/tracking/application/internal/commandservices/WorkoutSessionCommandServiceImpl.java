@@ -46,6 +46,9 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
         var routine = activeRoutineRepository.findByClientId(command.clientId())
                 .filter(candidate -> candidate.isActiveOn(command.date()))
                 .orElseThrow(ActiveRoutineNotFoundException::new);
+        if (!routine.trainsOn(command.date())) {
+            return Optional.empty();   // a rest day: there is no session to schedule
+        }
         var lastOrder = workoutSessionRepository.findLastFinishedByClientId(command.clientId())
                 .filter(last -> last.getRoutineId().equals(routine.getRoutineId()))
                 .map(WorkoutSession::getDayOrder);

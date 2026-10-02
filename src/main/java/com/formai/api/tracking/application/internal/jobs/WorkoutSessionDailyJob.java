@@ -61,7 +61,7 @@ public class WorkoutSessionDailyJob {
                     activeRoutineCommandService.handle(new EndActiveRoutineCommand(clientId, today.minusDays(1)));
                     continue;
                 }
-                if (synced.get().isActiveOn(today)) {
+                if (synced.get().trainsOn(today)) {
                     workoutSessionCommandService.handle(new ScheduleWorkoutSessionCommand(clientId, today));
                 }
             } catch (RuntimeException ex) {
