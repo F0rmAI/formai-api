@@ -5,7 +5,9 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
 ## Current status (2026-10-01)
 - The TP (MVP, Sprints 1–2) backend is complete: US-001…US-017 plus US-033/US-034 are delivered. US-005
   sends the reset email through Brevo's SMTP relay (branch `feature/brevo-email-delivery`, verified with a
-  real send). Suite: 408 tests. Audit against the `qs-monolith-serv` canon: ~85 % (2026-10-01).
+  real send). US-004 also has `POST /activation-code-verifications` (FE-MOB-003): the app checks the code
+  before asking for a password, without redeeming it. Suite: 415 tests. Audit against the
+  `qs-monolith-serv` canon: ~85 % (2026-10-01).
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
 - Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
