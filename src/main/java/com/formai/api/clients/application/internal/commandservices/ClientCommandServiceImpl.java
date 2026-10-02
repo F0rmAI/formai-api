@@ -1,0 +1,153 @@
+package com.formai.api.clients.application.internal.commandservices;
+
+import com.formai.api.clients.application.internal.outboundservices.acl.ExternalIamService;
+import com.formai.api.clients.domain.exceptions.ActivationCodeNotRenewableException;
+import com.formai.api.clients.domain.exceptions.ClientNotFoundException;
+import com.formai.api.clients.domain.model.aggregates.Client;
+import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
+import com.formai.api.clients.domain.model.commands.DeactivateClientCommand;
+import com.formai.api.clients.domain.model.commands.RegisterClientCommand;
+import com.formai.api.clients.domain.model.commands.RenewActivationCodeCommand;
+import com.formai.api.clients.domain.model.commands.TransferClientCommand;
+import com.formai.api.clients.domain.model.commands.UpdateBodyProfileCommand;
+import com.formai.api.clients.domain.model.commands.UpdateClientCommand;
+import com.formai.api.clients.domain.model.entities.BodyProfile;
+import com.formai.api.clients.domain.model.events.BodyWeightRecorded;
+import com.formai.api.clients.domain.model.events.ClientActivated;
+import com.formai.api.clients.domain.model.events.ClientDeactivated;
+import com.formai.api.clients.domain.model.events.ClientRegistered;
+import com.formai.api.clients.domain.model.events.ClientTransferred;
+import com.formai.api.clients.domain.model.valueobjects.ActivationTicket;
+import com.formai.api.clients.domain.model.valueobjects.ClientId;
+import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
+import com.formai.api.clients.domain.model.valueobjects.Email;
+import com.formai.api.clients.domain.model.valueobjects.RegisteredClient;
+import com.formai.api.clients.domain.repositories.ClientRepository;
+import com.formai.api.clients.domain.services.ClientCommandService;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+@Service
+public class ClientCommandServiceImpl implements ClientCommandService {
+
+    private final ClientRepository clientRepository;
+    private final ExternalIamService externalIamService;
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ClientCommandServiceImpl(ClientRepository clientRepository,
+                                    ExternalIamService externalIamService,
+                                    ApplicationEventPublisher eventPublisher) {
+        this.clientRepository = clientRepository;
+        this.externalIamService = externalIamService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Override
+    @Transactional
+    public Optional<RegisteredClient> handle(RegisterClientCommand command) {
+        var ticket = externalIamService.createClientAccount()
+                .orElseThrow(() -> new IllegalStateException("Creating a client account should never return empty"));
+        var saved = clientRepository.save(Client.register(command, ticket));
+
+        eventPublisher.publishEvent(new ClientRegistered(saved.getId().value(), saved.getHolderId()));
+        return Optional.of(new RegisteredClient(saved, ticket));
+    }
+
+    @Override
+    @Transactional
+    public Optional<Client> handle(UpdateClientCommand command) {
+        var client = findOwnClient(command.clientId(), command.holderId());
+        client.rename(command);
+        return Optional.of(clientRepository.save(client));
+    }
+
+    @Override
+    @Transactional
+    public Optional<ActivationTicket> handle(RenewActivationCodeCommand command) {
+        var client = findOwnClient(command.clientId(), command.holderId());
+        if (!client.canRenewActivationCode()) {
+            throw new ActivationCodeNotRenewableException();
+        }
+        var ticket = externalIamService.renewActivationCode(client.getId())
+                .orElseThrow(ActivationCodeNotRenewableException::new);
+        return Optional.of(ticket);
+    }
+
+    @Override
+    @Transactional
+    public void handle(ActivateClientCommand command) {
+        clientRepository.findById(command.clientId())
+                .filter(client -> client.getStatus() == ClientStatus.INVITED)
+                .ifPresent(client -> activate(client, command.email()));
+    }
+
+    // The invited record only carried the new trainer's invitation: the client's own record takes
+    // its trainer and the invited one is removed, so the trainer sees one client, with its history.
+    @Override
+    @Transactional
+    public void handle(TransferClientCommand command) {
+        var invited = clientRepository.findById(command.invitedClientId());
+        var existing = clientRepository.findById(command.existingClientId());
+        if (invited.isEmpty() || existing.isEmpty()) {
+            return;
+        }
+        var client = existing.get();
+        var previousHolderId = client.getHolderId();
+        client.transferTo(invited.get().getHolderId());
+        var saved = clientRepository.save(client);
+        clientRepository.delete(command.invitedClientId());
+
+        eventPublisher.publishEvent(new ClientTransferred(saved.getId().value(), previousHolderId,
+                saved.getHolderId()));
+    }
+
+    @Override
+    @Transactional
+    public Optional<Client> handle(DeactivateClientCommand command) {
+        var client = findOwnClient(command.clientId(), command.holderId());
+        if (client.getStatus() == ClientStatus.INACTIVE) {
+            return Optional.of(client);
+        }
+        client.deactivate();
+        var saved = clientRepository.save(client);
+        externalIamService.disableAccount(saved.getId());
+
+        eventPublisher.publishEvent(new ClientDeactivated(saved.getId().value(), saved.getHolderId()));
+        return Optional.of(saved);
+    }
+
+    @Override
+    @Transactional
+    public Optional<Client> handle(UpdateBodyProfileCommand command) {
+        var client = findOwnClient(command.clientId(), command.holderId());
+        var recordsBefore = client.getBodyProfile().map(profile -> profile.getWeightHistory().size()).orElse(0);
+        var today = LocalDate.now();
+        client.updateBodyProfile(command, today);
+        var saved = clientRepository.save(client);
+
+        var weightRecorded = saved.getBodyProfile().map(BodyProfile::getWeightHistory)
+                .filter(history -> history.size() > recordsBefore);
+        weightRecorded.ifPresent(history -> eventPublisher.publishEvent(new BodyWeightRecorded(
+                saved.getId().value(), command.weight().kilograms(), today)));
+        return Optional.of(saved);
+    }
+
+    private Client findOwnClient(ClientId clientId, String holderId) {
+        var client = clientRepository.findByIdAndHolderId(clientId, holderId)
+                .orElseThrow(ClientNotFoundException::new);
+        if (client.canRenewActivationCode()) {
+            externalIamService.fetchActivatedEmail(client.getId()).ifPresent(email -> activate(client, email));
+        }
+        return client;
+    }
+
+    private void activate(Client client, Email email) {
+        client.activate(email);
+        clientRepository.save(client);
+        eventPublisher.publishEvent(new ClientActivated(client.getId().value()));
+    }
+}

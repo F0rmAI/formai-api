@@ -1,0 +1,49 @@
+package com.formai.api.shared.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain jwtFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter) throws Exception {
+        return http
+                // CSRF token machinery stays disabled: the JWT now travels in a cookie the
+                // browser attaches automatically, so SameSite=Lax on that cookie
+                // (JwtCookieFactory) is the CSRF mitigation for this stateless JSON API,
+                // not Spring's form-oriented CSRF token filter. See CorsConfig for the
+                // cross-origin browser frontend scenario.
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/v1/authentication/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/account-activations",
+                                "/api/v1/activation-code-verifications",
+                                "/api/v1/password-reset-requests",
+                                "/api/v1/password-resets").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()   // healthchecks send no JWT
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Roles are additive (iam.domain.model.valueobjects.Role) and land as
+                        // ROLE_<name> authorities via JwtAuthenticationFilter (FR-002): the web
+                        // app is for trainers, the mobile app for clients. Any other role gets 403.
+                        .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/routines/**",
+                                "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
+                        .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**",
+                                "/api/v1/progress-charts/**", "/api/v1/client-profiles/**")
+                        .hasAuthority("ROLE_CLIENT")
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+}

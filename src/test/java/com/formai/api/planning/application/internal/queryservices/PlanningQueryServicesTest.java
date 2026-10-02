@@ -1,0 +1,150 @@
+package com.formai.api.planning.application.internal.queryservices;
+
+import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
+import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
+import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
+import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
+import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
+import com.formai.api.planning.domain.model.queries.GetRoutineVersionsQuery;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
+import com.formai.api.planning.domain.repositories.ClientPlanRepository;
+import com.formai.api.planning.domain.repositories.RoutineRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+import static com.formai.api.planning.PlanningTestData.CLIENT_ID;
+import static com.formai.api.planning.PlanningTestData.START_DATE;
+import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
+import static com.formai.api.planning.PlanningTestData.emptyPlan;
+import static com.formai.api.planning.PlanningTestData.routine;
+import static com.formai.api.planning.PlanningTestData.twoSessions;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PlanningQueryServicesTest {
+
+    @Mock
+    RoutineRepository routineRepository;
+
+    @Mock
+    ClientPlanRepository clientPlanRepository;
+
+    @Mock
+    ExternalClientsService externalClientsService;
+
+    @Test
+    void shouldListTheVersionsMostRecentFirst() {
+        // Arrange
+        var routine = routine();
+        routine.revise(new UpdateRoutineCommand(routine.getId(), TRAINER_HOLDER_ID, routine.getName(), twoSessions()));
+        when(routineRepository.findByIdAndHolderId(routine.getId(), TRAINER_HOLDER_ID)).thenReturn(Optional.of(routine));
+
+        // Act
+        var versions = new RoutineQueryServiceImpl(routineRepository)
+                .handle(new GetRoutineVersionsQuery(routine.getId(), TRAINER_HOLDER_ID));
+
+        // Assert
+        assertThat(versions).extracting(version -> version.getNumber()).containsExactly(2, 1);
+    }
+
+    @Test
+    void shouldReturnNoVersionsForAnotherTrainersRoutine() {
+        var routine = routine();
+        when(routineRepository.findByIdAndHolderId(routine.getId(), TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+
+        assertThat(new RoutineQueryServiceImpl(routineRepository)
+                .handle(new GetRoutineVersionsQuery(routine.getId(), TRAINER_HOLDER_ID))).isEmpty();
+    }
+
+    @Test
+    void shouldReturnTheCurrentAssignmentWithItsRoutine() {
+        var routine = routine();
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(routine.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+        when(routineRepository.findById(routine.getId())).thenReturn(Optional.of(routine));
+
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)).orElseThrow();
+
+        assertThat(active.routine()).isSameAs(routine);
+        assertThat(active.startDate()).isEqualTo(START_DATE);
+    }
+
+    @Test
+    void shouldKeepServingThePreviousRoutineUntilTheNewOneStarts() {
+        var today = LocalDate.now();
+        var previous = routine();
+        var next = routine();
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(previous.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.minusDays(10), TrainingDays.everyDay()));
+        plan.assign(new AssignRoutineCommand(next.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today.plusDays(5), TrainingDays.everyDay()));
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+        when(routineRepository.findById(previous.getId())).thenReturn(Optional.of(previous));
+
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)).orElseThrow();
+
+        assertThat(active.routine()).isSameAs(previous);
+        assertThat(active.startDate()).isEqualTo(today.minusDays(10));
+    }
+
+    @Test
+    void shouldReturnNoActiveAssignmentOnceItIsClosed() {
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(routine().getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
+        plan.closeCurrentAssignment(START_DATE.plusDays(3));
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+
+        assertThat(new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID))).isEmpty();
+    }
+
+    @Test
+    void shouldReturnTheAssignmentHistoryOfOneOfTheTrainersClientsEvenIfInactive() {
+        var plan = emptyPlan();
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(false));
+        when(clientPlanRepository.findByClientIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(plan));
+
+        assertThat(new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetClientPlanQuery(CLIENT_ID, TRAINER_HOLDER_ID))).contains(plan);
+    }
+
+    @Test
+    void shouldDenyTheAssignmentHistoryOfAnotherTrainersClient() {
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+        var service = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService);
+
+        assertThatThrownBy(() -> service.handle(new GetClientPlanQuery(CLIENT_ID, TRAINER_HOLDER_ID)))
+                .isInstanceOf(ClientAccessDeniedException.class);
+    }
+
+    @Test
+    void shouldServeTheLatestAssignmentWhenTwoCoverToday() {
+        // Arrange: a routine assigned today is replaced the same day; both cover today
+        var first = routine();
+        var replacement = routine();
+        var today = LocalDate.now();
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(first.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today, TrainingDays.everyDay()));
+        plan.assign(new AssignRoutineCommand(replacement.getId(), CLIENT_ID, TRAINER_HOLDER_ID, today, TrainingDays.everyDay()));
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+        when(routineRepository.findById(replacement.getId())).thenReturn(Optional.of(replacement));
+
+        // Act
+        var active = new ClientPlanQueryServiceImpl(clientPlanRepository, routineRepository, externalClientsService)
+                .handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID));
+
+        // Assert
+        assertThat(active).hasValueSatisfying(assignment ->
+                assertThat(assignment.routine().getId()).isEqualTo(replacement.getId()));
+    }
+}
