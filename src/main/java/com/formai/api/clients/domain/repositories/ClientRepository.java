@@ -16,6 +16,8 @@ public interface ClientRepository {
 
     Optional<Client> findById(ClientId id);
 
+    void delete(ClientId id);
+
     ClientPage findAllByHolderId(String holderId, Optional<String> search, Optional<ClientStatus> status,
                                  Pagination pagination);
 }

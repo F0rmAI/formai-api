@@ -58,6 +58,13 @@ public class Client {
         this.status = ClientStatus.INACTIVE;
     }
 
+    // The client joins another trainer, or comes back to the same one. The record keeps its id,
+    // so the body profile, the weight history and everything tracking recorded stay with it.
+    public void transferTo(String newHolderId) {
+        this.holderId = newHolderId;
+        this.status = ClientStatus.ACTIVE;
+    }
+
     public void updateBodyProfile(UpdateBodyProfileCommand command, LocalDate today) {
         if (bodyProfile == null) {
             bodyProfile = new BodyProfile(command.goal(), command.height(), command.restrictions());
