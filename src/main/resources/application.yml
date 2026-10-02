@@ -41,6 +41,7 @@ formai:
     secret: ${JWT_SECRET}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:30}
     refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:7}   # NFR-007: refresh token lifetime
+    cookie-secure: ${JWT_COOKIE_SECURE:true}   # false only for local development over plain HTTP
 
 cors:
   allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}

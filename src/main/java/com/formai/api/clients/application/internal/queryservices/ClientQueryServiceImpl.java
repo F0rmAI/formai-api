@@ -3,6 +3,7 @@ package com.formai.api.clients.application.internal.queryservices;
 import com.formai.api.clients.application.internal.outboundservices.acl.ExternalIamService;
 import com.formai.api.clients.domain.model.aggregates.Client;
 import com.formai.api.clients.domain.model.queries.GetClientByIdQuery;
+import com.formai.api.clients.domain.model.queries.GetClientProfileQuery;
 import com.formai.api.clients.domain.model.queries.GetClientsQuery;
 import com.formai.api.clients.domain.model.valueobjects.ClientPage;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
@@ -38,6 +39,11 @@ public class ClientQueryServiceImpl implements ClientQueryService {
                     showActivation(client);
                     return client;
                 });
+    }
+
+    @Override
+    public Optional<Client> handle(GetClientProfileQuery query) {
+        return clientRepository.findById(query.clientId());
     }
 
     private void showActivation(Client client) {

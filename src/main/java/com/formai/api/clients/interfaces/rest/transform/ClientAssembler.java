@@ -22,6 +22,7 @@ import com.formai.api.clients.interfaces.rest.resources.ActivationCodeResource;
 import com.formai.api.clients.interfaces.rest.resources.BodyProfileResource;
 import com.formai.api.clients.interfaces.rest.resources.BodyWeightRecordResource;
 import com.formai.api.clients.interfaces.rest.resources.ClientPageResource;
+import com.formai.api.clients.interfaces.rest.resources.ClientProfileResource;
 import com.formai.api.clients.interfaces.rest.resources.ClientResource;
 import com.formai.api.clients.interfaces.rest.resources.RegisterClientResource;
 import com.formai.api.clients.interfaces.rest.resources.RegisteredClientResource;
@@ -42,6 +43,8 @@ import java.util.UUID;
 public interface ClientAssembler {
 
     ClientResource toResource(Client client);
+
+    ClientProfileResource toProfileResource(Client client);
 
     @Mapping(target = "content", source = "items")
     ClientPageResource toResource(ClientPage page);

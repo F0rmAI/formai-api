@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = ClientsController.class)
+@RestControllerAdvice(assignableTypes = {ClientsController.class, ClientProfilesController.class})
 public class ClientsControllerAdvice {
 
     @ExceptionHandler(ClientNotFoundException.class)

@@ -104,6 +104,8 @@ includes the following features:
 - Renew the activation code of a client who has not activated the account yet.
 - List, search by name and filter by status the trainer's own clients; rename a client.
 - Deactivate a client: the account can no longer sign in and the history is kept.
+- Let the signed-in client read their own name and email (`GET /client-profiles/me`), so the
+  mobile app can greet them by name.
 - Record the body profile (goal, height between 100 and 250 cm, weight above 0 kg,
   restrictions), keeping every weight change with its date.
 
@@ -249,6 +251,11 @@ cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64
 are optional; `.env.example` shows their defaults. To send the password reset email, set the
 Brevo SMTP variables (`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
 
+`JWT_COOKIE_SECURE` (default `true`) controls the `Secure` flag of the session cookies. Set it to
+`false` only for local development over plain HTTP with the mobile app: iOS and Android never send
+a `Secure` cookie to `http://localhost`, so sign-in would work but every later call would arrive
+without a session.
+
 ### Running the application
 
 ```bash
@@ -345,7 +352,7 @@ environment — there is no permit-all development mode. `/api/v1/authentication
 stays public (sign-up/sign-in/refresh/sign-out), as do `POST` on `/api/v1/activation-code-verifications`, `/api/v1/account-activations`,
 `/api/v1/password-reset-requests` and `/api/v1/password-resets`; every other endpoint
 requires a valid JWT. Trainer routes (`/clients/**`, `/exercises/**`, `/routines/**`,
-`/client-overviews/**`) also require `ROLE_TRAINER`, and client routes (`/active-routines/**`,
+`/client-overviews/**`) also require `ROLE_TRAINER`, and client routes (`/client-profiles/**`, `/active-routines/**`,
 `/workout-sessions/**`, `/progress-charts/**`) require `ROLE_CLIENT`; trainer data is always
 scoped to the signed-in trainer (`holderId` = JWT `sub`).
 
@@ -454,6 +461,7 @@ Partially delivered: **US-030** (link exercises to published machines,
 | `POST` | `/api/v1/routines/{id}/duplicates` | Routines | `201` | `400` `403` `404` | Trainer |
 | `POST` | `/api/v1/routines/{id}/assignments` | Routines | `201` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/client-overviews?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/client-profiles/me` | Clients | `200` | `403` `404` | Client |
 | `GET` | `/api/v1/active-routines/me` | Workouts | `200` | `403` `404` | Client |
 | `GET` | `/api/v1/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Client |
 | `GET` | `/api/v1/workout-sessions/{id}` | Workouts | `200` | `403` `404` | Client |
@@ -487,7 +495,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 417 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 424 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on

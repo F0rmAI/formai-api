@@ -10,6 +10,7 @@ import com.formai.api.clients.domain.model.aggregates.Trainer;
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.commands.RegisterTrainerCommand;
 import com.formai.api.clients.domain.model.queries.GetClientByIdQuery;
+import com.formai.api.clients.domain.model.queries.GetClientProfileQuery;
 import com.formai.api.clients.domain.model.queries.GetClientsQuery;
 import com.formai.api.clients.domain.model.valueobjects.ClientPage;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
@@ -192,6 +193,17 @@ class ClientsIntegrationPointsTest {
         assertThat(client.getStatus()).isEqualTo(ClientStatus.ACTIVE);
         assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
         verify(clientRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldReturnTheClientsOwnProfileWithoutATrainer() {
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(activeClient()));
+
+        var client = new ClientQueryServiceImpl(clientRepository, externalIamService)
+                .handle(new GetClientProfileQuery(CLIENT_ID)).orElseThrow();
+
+        assertThat(client.getFullName().value()).isEqualTo("Luis Ramos");
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
     }
 
     @Test

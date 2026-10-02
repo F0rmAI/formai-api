@@ -7,7 +7,8 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
   sends the reset email through Brevo's SMTP relay (branch `feature/brevo-email-delivery`, verified with a
   real send). US-004 also has `POST /activation-code-verifications` (FE-MOB-003): the app checks the code
   before asking for a password, without redeeming it. The trainer registers a client with the name only;
-  the client sets the email on activation (branch `fix/register-client-email`). Suite: 417 tests. Audit against the
+  the client sets the email on activation (branch `fix/register-client-email`). `GET /client-profiles/me` gives the
+  signed-in client their own name and email (the app greets by name). Suite: 424 tests. Audit against the
   `qs-monolith-serv` canon: ~85 % (2026-10-01).
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
