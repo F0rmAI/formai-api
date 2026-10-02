@@ -75,9 +75,17 @@ public class WorkoutSession {
         return status;
     }
 
-    public void skip() {
+    // The daily closing of a past session the client never finished: SKIPPED when nothing was
+    // recorded; otherwise it is finished on the client's behalf, COMPLETED or PARTIAL like finish.
+    public ComplianceStatus closeOverdue(Instant now) {
         ensurePending();
-        status = ComplianceStatus.SKIPPED;
+        if (!hasRecords()) {
+            status = ComplianceStatus.SKIPPED;
+        } else {
+            status = isComplete() ? ComplianceStatus.COMPLETED : ComplianceStatus.PARTIAL;
+            finishedAt = now;
+        }
+        return status;
     }
 
     // COMPLETED asks for every prescribed set of every exercise; anything less is PARTIAL.
