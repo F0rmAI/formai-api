@@ -48,7 +48,6 @@ public interface ClientAssembler {
 
     @Mapping(target = "id", source = "client.id")
     @Mapping(target = "fullName", source = "client.fullName")
-    @Mapping(target = "email", source = "client.email")
     @Mapping(target = "status", source = "client.status")
     @Mapping(target = "activationCode", source = "ticket.code")
     @Mapping(target = "activationCodeExpiresAt", source = "ticket.expiresAt")
@@ -66,7 +65,6 @@ public interface ClientAssembler {
 
     @Mapping(target = "holderId", source = "holderId")
     @Mapping(target = "fullName", source = "resource.fullName")
-    @Mapping(target = "email", source = "resource.email")
     RegisterClientCommand toCommand(String holderId, RegisterClientResource resource);
 
     @Mapping(target = "clientId", source = "clientId")

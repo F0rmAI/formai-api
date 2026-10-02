@@ -33,7 +33,6 @@ public class Client {
         client.id = ticket.clientId();
         client.holderId = command.holderId();
         client.fullName = command.fullName();
-        client.email = command.email();
         client.status = ClientStatus.INVITED;
         client.registeredAt = Instant.now();
         return client;
@@ -47,8 +46,10 @@ public class Client {
         return status == ClientStatus.INVITED;
     }
 
-    public void activate() {
+    // The email is the one the client chose when activating the account; until then it is empty.
+    public void activate(Email email) {
         if (status == ClientStatus.INVITED) {
+            this.email = email;
             this.status = ClientStatus.ACTIVE;
         }
     }

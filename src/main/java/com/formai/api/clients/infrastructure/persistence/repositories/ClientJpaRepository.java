@@ -18,8 +18,6 @@ public interface ClientJpaRepository extends JpaRepository<ClientJpaEntity, UUID
 
     Optional<ClientJpaEntity> findByIdAndHolderId(UUID id, String holderId);
 
-    boolean existsByHolderIdAndEmail(String holderId, String email);
-
     @Query("select c from ClientJpaEntity c where c.holderId = :holderId "
             + "and lower(c.fullName) like lower(concat('%', :search, '%')) and c.status in :statuses")
     Page<ClientJpaEntity> search(@Param("holderId") String holderId, @Param("search") String search,

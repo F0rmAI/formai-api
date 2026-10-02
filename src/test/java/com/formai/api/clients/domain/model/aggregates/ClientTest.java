@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
+import static com.formai.api.clients.ClientsTestData.CLIENT_EMAIL;
 import static com.formai.api.clients.ClientsTestData.CLIENT_ID;
 import static com.formai.api.clients.ClientsTestData.TODAY;
 import static com.formai.api.clients.ClientsTestData.TRAINER_HOLDER_ID;
@@ -32,15 +33,25 @@ class ClientTest {
         assertThat(client.getId()).isEqualTo(CLIENT_ID);
         assertThat(client.getHolderId()).isEqualTo(TRAINER_HOLDER_ID);
         assertThat(client.getStatus()).isEqualTo(ClientStatus.INVITED);
+        assertThat(client.getEmail()).isNull();
         assertThat(client.getBodyProfile()).isEmpty();
         assertThat(client.canRenewActivationCode()).isTrue();
         assertThat(client.isActive()).isFalse();
     }
 
     @Test
+    void shouldTakeTheEmailTheClientChoseOnActivation() {
+        var client = invitedClient();
+        client.activate(CLIENT_EMAIL);
+
+        assertThat(client.isActive()).isTrue();
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
+    }
+
+    @Test
     void shouldOnlyRenewTheCodeWhileInvited() {
         var client = invitedClient();
-        client.activate();
+        client.activate(CLIENT_EMAIL);
 
         assertThat(client.isActive()).isTrue();
         assertThat(client.canRenewActivationCode()).isFalse();
@@ -50,9 +61,10 @@ class ClientTest {
     void shouldKeepADeactivatedClientInactiveEvenIfItsAccountIsActivatedLater() {
         var client = activeClient();
         client.deactivate();
-        client.activate();
+        client.activate(new Email("otro@formai.com"));
 
         assertThat(client.getStatus()).isEqualTo(ClientStatus.INACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
     }
 
     @Test

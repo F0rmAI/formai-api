@@ -2,6 +2,7 @@ package com.formai.api.clients.application.internal.eventhandlers;
 
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.valueobjects.ClientId;
+import com.formai.api.clients.domain.model.valueobjects.Email;
 import com.formai.api.clients.domain.services.ClientCommandService;
 import com.formai.api.iam.domain.model.events.AccountActivated;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ public class AccountActivatedEventHandler {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(AccountActivated event) {
-        clientCommandService.handle(new ActivateClientCommand(new ClientId(event.userId())));
+        clientCommandService.handle(new ActivateClientCommand(new ClientId(event.userId()),
+                new Email(event.email())));
     }
 }

@@ -59,10 +59,11 @@ The IAM Context owns every FormAI account (trainers and clients) and how they ge
 - **Sign-out** revokes the refresh token and clears both httpOnly cookies server-side.
   Disabling an account revokes all of its refresh tokens.
 - **Client accounts with activation codes.** A trainer creates a client account
-  `PENDING_ACTIVATION` with a one-time, 8-character code valid for 72 hours, shown on screen
-  and shared by hand. Reissuing a code replaces the previous one. The client activates the
-  account with the code, a password and the personal data processing consent, recorded with
-  the version of the consent text and the acceptance date (Law No. 29733).
+  `PENDING_ACTIVATION`, without an email, with a one-time, 8-character code valid for 72 hours,
+  shown on screen and shared by hand. Reissuing a code replaces the previous one. The client
+  activates the account from the mobile app with the code, the email they will sign in with
+  (unique across accounts, `409` if taken), a password and the personal data processing consent,
+  recorded with the version of the consent text and the acceptance date (Law No. 29733).
 - **Password reset by email.** A request issues a one-time link token valid for 30
   minutes, and only its SHA-256 hash is stored. The request always answers the same
   message, whether the email exists or not.
@@ -77,17 +78,18 @@ Other contexts reach IAM only through its Open Host Service,
 
 | Facade method | Purpose |
 |---|---|
-| `createClientAccount(email)` | Create a pending client account and return its activation code |
+| `createClientAccount()` | Create a pending client account, without an email, and return its activation code |
 | `reissueActivationCode(userId)` | Replace the activation code of a pending client |
 | `disableAccount(userId)` | Disable an account so it can no longer sign in |
 | `fetchAccountStatus(userId)` | Read the account status (`PENDING_ACTIVATION`, `ACTIVE`, `DISABLED`) |
+| `fetchAccountEmail(userId)` | Read the email of an account; empty while a client account is pending |
 
 IAM publishes these in-process domain events:
 
 | Event | Published when | Intended consumer |
 |---|---|---|
 | `UserRegistered` | A trainer signs up (carries full name and email) | clients context |
-| `AccountActivated` | A client activates the account | clients context |
+| `AccountActivated` | A client activates the account (carries the email the client chose) | clients context |
 | `PasswordResetRequested` | A password reset link is issued (carries the raw token) | notifications context |
 | `ActivationCodeIssued` | An activation code is created or reissued | audit only |
 | `AccountLocked` | An account gets locked after failed sign-ins | audit only |
@@ -97,7 +99,8 @@ IAM publishes these in-process domain events:
 The Clients Context is responsible for the trainer's clients and their data for planning. It
 includes the following features:
 
-- Register a client as `INVITED` and show a 72-hour activation code on screen.
+- Register a client as `INVITED` with the name only and show a 72-hour activation code on
+  screen. The client's email stays empty until the client activates the account and chooses it.
 - Renew the activation code of a client who has not activated the account yet.
 - List, search by name and filter by status the trainer's own clients; rename a client.
 - Deactivate a client: the account can no longer sign in and the history is kept.
@@ -390,8 +393,8 @@ ahead of it, US-030 partially (see below).
 |---|---|---|---|
 | US-001 | As a personal trainer, sign up with my email and password | `POST /api/v1/authentication/sign-up` | Creates an active trainer account with a BCrypt-hashed password; a taken email answers `409` |
 | US-002 | As a trainer or client, sign in and sign out securely | `POST /api/v1/authentication/sign-in` · `POST /api/v1/authentication/refresh` · `POST /api/v1/authentication/sign-out` | Issues the JWT and a rotating refresh token in httpOnly cookies per channel (trainers on the web, clients on the app), locks the account after 5 failures, and revokes the session on sign-out |
-| US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with a 72-hour activation code and renews it, invalidating the previous one |
-| US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/activation-code-verifications` · `POST /api/v1/account-activations` | Checks that the code exists and has not expired, then activates the account with a valid code, a password and the data processing consent with the version of its text |
+| US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with the name only (no email) and a 72-hour activation code, and renews it, invalidating the previous one |
+| US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/activation-code-verifications` · `POST /api/v1/account-activations` | Checks that the code exists and has not expired, then activates the account with a valid code, the email to sign in with, a password and the data processing consent with the version of its text |
 | US-005 | As a trainer or client, reset my password from my email | `POST /api/v1/password-reset-requests` · `POST /api/v1/password-resets` | Emails a one-time link valid for 30 minutes through Brevo, answers the same message whether the email exists or not, and rejects a used or expired link |
 | US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history |
 | US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
@@ -421,10 +424,10 @@ Partially delivered: **US-030** (link exercises to published machines,
 | `POST` | `/api/v1/authentication/refresh` | Account access | `200` + new cookies | `401` | No (refresh cookie) |
 | `POST` | `/api/v1/authentication/sign-out` | Account access | `204` | — | No |
 | `POST` | `/api/v1/activation-code-verifications` | Account access | `201` | `400` `422` | No |
-| `POST` | `/api/v1/account-activations` | Account access | `201` | `400` `422` | No |
+| `POST` | `/api/v1/account-activations` | Account access | `201` | `400` `409` `422` | No |
 | `POST` | `/api/v1/password-reset-requests` | Account access | `201` | `400` | No |
 | `POST` | `/api/v1/password-resets` | Account access | `201` | `400` `422` | No |
-| `POST` | `/api/v1/clients` | Clients | `201` | `400` `403` `409` | Trainer |
+| `POST` | `/api/v1/clients` | Clients | `201` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients?search&status&page&size` | Clients | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}` | Clients | `200` | `403` `404` | Trainer |
 | `PUT` | `/api/v1/clients/{id}` | Clients | `200` | `400` `403` `404` | Trainer |
@@ -484,7 +487,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 415 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 417 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on

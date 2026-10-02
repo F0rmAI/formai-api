@@ -50,7 +50,7 @@ class UserQueryServiceImplTest {
     }
 
     private static User pendingClientCreatedAt(Instant createdAt) {
-        return User.createPendingClient(new CreateClientAccountCommand(new Email("client@formai.com")), createdAt);
+        return User.createPendingClient(new CreateClientAccountCommand(), createdAt);
     }
 
     @Test

@@ -1,7 +1,8 @@
 package com.formai.api.iam.application.acl;
 
-import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.model.aggregates.User;
+import com.formai.api.iam.domain.model.commands.ActivateAccountCommand;
+import com.formai.api.iam.domain.model.valueobjects.HashedPassword;
 import com.formai.api.iam.domain.model.commands.CreateClientAccountCommand;
 import com.formai.api.iam.domain.model.commands.DisableAccountCommand;
 import com.formai.api.iam.domain.model.commands.ReissueActivationCodeCommand;
@@ -43,32 +44,23 @@ class IamContextFacadeImplTest {
     IamContextFacadeImpl facade;
 
     private static User pendingClient() {
-        return User.createPendingClient(new CreateClientAccountCommand(new Email("client@formai.com")), Instant.now());
+        return User.createPendingClient(new CreateClientAccountCommand(), Instant.now());
     }
 
     @Test
     void shouldReturnActivationSummaryWhenClientAccountIsCreated() {
         // Arrange
         var client = pendingClient();
-        when(userCommandService.handle(new CreateClientAccountCommand(new Email("client@formai.com"))))
-                .thenReturn(Optional.of(client));
+        when(userCommandService.handle(new CreateClientAccountCommand())).thenReturn(Optional.of(client));
 
         // Act
-        var summary = facade.createClientAccount("client@formai.com");
+        var summary = facade.createClientAccount();
 
         // Assert
         assertThat(summary).isPresent();
         assertThat(summary.get().userId()).isEqualTo(client.getId());
         assertThat(summary.get().activationCode()).isEqualTo(client.getActivationCode().getCode());
         assertThat(summary.get().expiresAt()).isEqualTo(client.getActivationCode().getExpiresAt());
-    }
-
-    @Test
-    void shouldReturnEmptyWhenClientEmailIsAlreadyRegistered() {
-        when(userCommandService.handle(any(CreateClientAccountCommand.class)))
-                .thenThrow(new EmailAlreadyRegisteredException("client@formai.com"));
-
-        assertThat(facade.createClientAccount("client@formai.com")).isEmpty();
     }
 
     @Test
@@ -123,5 +115,23 @@ class IamContextFacadeImplTest {
         when(userQueryService.handle(new GetUserByIdQuery(id))).thenReturn(Optional.empty());
 
         assertThat(facade.fetchAccountStatus(id)).isEmpty();
+    }
+
+    @Test
+    void shouldReturnNoEmailWhileTheClientAccountIsPending() {
+        var client = pendingClient();
+        when(userQueryService.handle(new GetUserByIdQuery(client.getId()))).thenReturn(Optional.of(client));
+
+        assertThat(facade.fetchAccountEmail(client.getId())).isEmpty();
+    }
+
+    @Test
+    void shouldReturnTheEmailTheClientChoseOnActivation() {
+        var client = pendingClient();
+        client.activate(new ActivateAccountCommand(client.getActivationCode().getCode(), new Email("client@formai.com"),
+                "secret123", true, "1.0"), new HashedPassword("hashed"), Instant.now());
+        when(userQueryService.handle(new GetUserByIdQuery(client.getId()))).thenReturn(Optional.of(client));
+
+        assertThat(facade.fetchAccountEmail(client.getId())).contains("client@formai.com");
     }
 }

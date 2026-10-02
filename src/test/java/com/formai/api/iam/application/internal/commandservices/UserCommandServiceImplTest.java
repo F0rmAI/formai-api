@@ -68,7 +68,7 @@ class UserCommandServiceImplTest {
     }
 
     private static User pendingClient() {
-        return User.createPendingClient(new CreateClientAccountCommand(CLIENT_EMAIL), Instant.now());
+        return User.createPendingClient(new CreateClientAccountCommand(), Instant.now());
     }
 
     private void saveReturnsArgument() {
@@ -210,25 +210,17 @@ class UserCommandServiceImplTest {
     }
 
     @Test
-    void shouldThrowWhenCreatingClientWithRegisteredEmail() {
-        when(userRepository.existsByEmail(CLIENT_EMAIL)).thenReturn(true);
-
-        assertThatThrownBy(() -> commandService.handle(new CreateClientAccountCommand(CLIENT_EMAIL)))
-                .isInstanceOf(EmailAlreadyRegisteredException.class);
-    }
-
-    @Test
     void shouldCreatePendingClientAndPublishActivationCodeIssued() {
         // Arrange
-        when(userRepository.existsByEmail(CLIENT_EMAIL)).thenReturn(false);
         saveReturnsArgument();
 
         // Act
-        var result = commandService.handle(new CreateClientAccountCommand(CLIENT_EMAIL));
+        var result = commandService.handle(new CreateClientAccountCommand());
 
         // Assert
         assertThat(result).isPresent();
         assertThat(result.get().getStatus()).isEqualTo(AccountStatus.PENDING_ACTIVATION);
+        assertThat(result.get().getEmail()).isNull();
         var event = (ActivationCodeIssued) publishedEvent();
         assertThat(event.userId()).isEqualTo(result.get().getId());
         assertThat(event.expiresAt()).isEqualTo(result.get().getActivationCode().getExpiresAt());
@@ -266,7 +258,8 @@ class UserCommandServiceImplTest {
     void shouldThrowWhenActivatingWithUnknownCode() {
         when(userRepository.findByActivationCode("UNKNOWN1")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> commandService.handle(new ActivateAccountCommand("UNKNOWN1", "secret123", true, "1.0")))
+        assertThatThrownBy(() -> commandService.handle(new ActivateAccountCommand("UNKNOWN1", CLIENT_EMAIL, "secret123",
+                true, "1.0")))
                 .isInstanceOf(InvalidActivationCodeException.class);
     }
 
@@ -280,14 +273,51 @@ class UserCommandServiceImplTest {
         saveReturnsArgument();
 
         // Act
-        var result = commandService.handle(new ActivateAccountCommand(code, "secret123", true, "1.0"));
+        var result = commandService.handle(new ActivateAccountCommand(code, CLIENT_EMAIL, "secret123", true, "1.0"));
 
         // Assert
         assertThat(result).isPresent();
         assertThat(result.get().getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(result.get().getEmail()).isEqualTo(CLIENT_EMAIL);
         assertThat(result.get().getHashedPassword().value()).isEqualTo("hashed");
         var event = (AccountActivated) publishedEvent();
         assertThat(event.userId()).isEqualTo(client.getId());
+        assertThat(event.email()).isEqualTo("client@formai.com");
+    }
+
+    @Test
+    void shouldRejectActivationWhenTheEmailBelongsToAnotherAccount() {
+        // Arrange
+        var client = pendingClient();
+        var code = client.getActivationCode().getCode();
+        when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(client));
+        when(hashingService.hash("secret123")).thenReturn("hashed");
+        when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(pendingClient()));
+
+        // Act & Assert
+        assertThatThrownBy(() -> commandService.handle(
+                new ActivateAccountCommand(code, CLIENT_EMAIL, "secret123", true, "1.0")))
+                .isInstanceOf(EmailAlreadyRegisteredException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldLetAnAccountInvitedWithAnEmailKeepItOnActivation() {
+        // Arrange: accounts created before the trainer stopped typing the email already hold one
+        var client = pendingClient();
+        client.setEmail(CLIENT_EMAIL);
+        var code = client.getActivationCode().getCode();
+        when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(client));
+        when(hashingService.hash("secret123")).thenReturn("hashed");
+        when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(client));
+        saveReturnsArgument();
+
+        // Act
+        var result = commandService.handle(new ActivateAccountCommand(code, CLIENT_EMAIL, "secret123", true, "1.0"));
+
+        // Assert
+        assertThat(result).isPresent();
+        assertThat(result.get().getStatus()).isEqualTo(AccountStatus.ACTIVE);
     }
 
     @Test

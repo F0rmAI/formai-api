@@ -73,7 +73,8 @@ public class User {
     }
 
     public static User createPendingClient(CreateClientAccountCommand command, Instant now) {
-        var user = new User(command.email(), EnumSet.of(Role.REGISTERED_USER, Role.CLIENT),
+        // The email stays empty until the client activates the account and chooses it.
+        var user = new User(null, EnumSet.of(Role.REGISTERED_USER, Role.CLIENT),
                 AccountStatus.PENDING_ACTIVATION, now);
         user.activationCode = newActivationCode(now);
         return user;
@@ -98,6 +99,7 @@ public class User {
             throw new ConsentRequiredException();
         }
         assertPasswordPolicy(command.rawPassword());
+        this.email = command.email();
         this.hashedPassword = hashedPassword;
         this.status = AccountStatus.ACTIVE;
         this.activationCode.markUsed(now);

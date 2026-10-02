@@ -28,7 +28,7 @@ public final class ClientsTestData {
     }
 
     public static RegisterClientCommand registerCommand() {
-        return new RegisterClientCommand(TRAINER_HOLDER_ID, new FullName("Luis Ramos"), CLIENT_EMAIL);
+        return new RegisterClientCommand(TRAINER_HOLDER_ID, new FullName("Luis Ramos"));
     }
 
     public static ActivationTicket ticket() {
@@ -41,7 +41,7 @@ public final class ClientsTestData {
 
     public static Client activeClient() {
         var client = invitedClient();
-        client.activate();
+        client.activate(CLIENT_EMAIL);
         return client;
     }
 

@@ -91,6 +91,18 @@ class ClientsIntegrationPointsTest {
     }
 
     @Test
+    void shouldSummariseAnInvitedClientWithoutEmail() {
+        when(clientQueryService.handle(new GetClientByIdQuery(CLIENT_ID, TRAINER_HOLDER_ID)))
+                .thenReturn(Optional.of(invitedClient()));
+
+        var summary = new ClientsContextFacadeImpl(clientQueryService)
+                .fetchClientOfTrainer(CLIENT_ID.value(), TRAINER_HOLDER_ID).orElseThrow();
+
+        assertThat(summary.email()).isNull();
+        assertThat(summary.status()).isEqualTo("INVITED");
+    }
+
+    @Test
     void shouldPublishAPageOfTheTrainersClientsFilteredByStatus() {
         when(clientQueryService.handle(new GetClientsQuery(TRAINER_HOLDER_ID, Optional.of("lu"),
                 Optional.of(ClientStatus.ACTIVE), new Pagination(0, 20))))
@@ -114,10 +126,10 @@ class ClientsIntegrationPointsTest {
 
     @Test
     void shouldTurnTheNewIamAccountIntoAnActivationTicket() {
-        when(iamContextFacade.createClientAccount("luis@formai.com"))
+        when(iamContextFacade.createClientAccount())
                 .thenReturn(Optional.of(new AccountActivationSummary(CLIENT_ID.value(), "ABCD2345", CODE_EXPIRES_AT)));
 
-        var ticket = new ExternalIamService(iamContextFacade).createClientAccount(CLIENT_EMAIL).orElseThrow();
+        var ticket = new ExternalIamService(iamContextFacade).createClientAccount().orElseThrow();
 
         assertThat(ticket.clientId()).isEqualTo(CLIENT_ID);
         assertThat(ticket.code()).isEqualTo("ABCD2345");
@@ -125,16 +137,17 @@ class ClientsIntegrationPointsTest {
     }
 
     @Test
-    void shouldTellWhetherTheClientsAccountIsActive() {
+    void shouldReturnTheEmailOnlyOnceTheClientsAccountIsActive() {
         var acl = new ExternalIamService(iamContextFacade);
         when(iamContextFacade.fetchAccountStatus(CLIENT_ID.value()))
                 .thenReturn(Optional.of("ACTIVE"))
                 .thenReturn(Optional.of("PENDING_ACTIVATION"))
                 .thenReturn(Optional.empty());
+        when(iamContextFacade.fetchAccountEmail(CLIENT_ID.value())).thenReturn(Optional.of("luis@formai.com"));
 
-        assertThat(acl.isAccountActive(CLIENT_ID)).isTrue();
-        assertThat(acl.isAccountActive(CLIENT_ID)).isFalse();
-        assertThat(acl.isAccountActive(CLIENT_ID)).isFalse();
+        assertThat(acl.fetchActivatedEmail(CLIENT_ID)).contains(CLIENT_EMAIL);
+        assertThat(acl.fetchActivatedEmail(CLIENT_ID)).isEmpty();
+        assertThat(acl.fetchActivatedEmail(CLIENT_ID)).isEmpty();
     }
 
     @Test
@@ -162,20 +175,22 @@ class ClientsIntegrationPointsTest {
 
     @Test
     void shouldActivateTheClientWhenTheirAccountIsActivated() {
-        new AccountActivatedEventHandler(clientCommandService).on(new AccountActivated(CLIENT_ID.value(), Instant.now()));
+        new AccountActivatedEventHandler(clientCommandService)
+                .on(new AccountActivated(CLIENT_ID.value(), "luis@formai.com", Instant.now()));
 
-        verify(clientCommandService).handle(new ActivateClientCommand(CLIENT_ID));
+        verify(clientCommandService).handle(new ActivateClientCommand(CLIENT_ID, CLIENT_EMAIL));
     }
 
     @Test
     void shouldShowAnInvitedClientAsActiveOnceItsAccountIsActive() {
         when(clientRepository.findByIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(invitedClient()));
-        when(externalIamService.isAccountActive(CLIENT_ID)).thenReturn(true);
+        when(externalIamService.fetchActivatedEmail(CLIENT_ID)).thenReturn(Optional.of(CLIENT_EMAIL));
 
         var client = new ClientQueryServiceImpl(clientRepository, externalIamService)
                 .handle(new GetClientByIdQuery(CLIENT_ID, TRAINER_HOLDER_ID)).orElseThrow();
 
         assertThat(client.getStatus()).isEqualTo(ClientStatus.ACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
         verify(clientRepository, never()).save(any());
     }
 

@@ -1,6 +1,7 @@
 package com.formai.api.iam.interfaces.rest;
 
 import com.formai.api.iam.domain.exceptions.ConsentRequiredException;
+import com.formai.api.iam.domain.exceptions.EmailAlreadyRegisteredException;
 import com.formai.api.iam.domain.exceptions.InvalidActivationCodeException;
 import com.formai.api.iam.domain.exceptions.PasswordPolicyViolationException;
 import org.springframework.core.Ordered;
@@ -18,6 +19,11 @@ public class AccountActivationsControllerAdvice {
     @ExceptionHandler(InvalidActivationCodeException.class)
     public ProblemDetail handleInvalidActivationCode(InvalidActivationCodeException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ProblemDetail handleEmailAlreadyRegistered(EmailAlreadyRegisteredException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(ConsentRequiredException.class)

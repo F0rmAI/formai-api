@@ -31,12 +31,15 @@ class UserTest {
         return User.registerTrainer(new SignUpCommand(new Email("trainer@formai.com"), "secret123", "Ana Trainer"), HASHED);
     }
 
+    private static final Email CLIENT_EMAIL = new Email("client@formai.com");
+
     private static User pendingClient() {
-        return User.createPendingClient(new CreateClientAccountCommand(new Email("client@formai.com")), NOW);
+        return User.createPendingClient(new CreateClientAccountCommand(), NOW);
     }
 
     private static ActivateAccountCommand activation(User client, String rawPassword, boolean consentAccepted) {
-        return new ActivateAccountCommand(client.getActivationCode().getCode(), rawPassword, consentAccepted, "1.0");
+        return new ActivateAccountCommand(client.getActivationCode().getCode(), CLIENT_EMAIL, rawPassword,
+                consentAccepted, "1.0");
     }
 
     @Test
@@ -106,6 +109,7 @@ class UserTest {
         client.activate(activation(client, "secret123", true), HASHED, activatedAt);
 
         assertThat(client.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
         assertThat(client.getHashedPassword()).isEqualTo(HASHED);
         assertThat(client.getActivationCode().getUsedAt()).isEqualTo(activatedAt);
         assertThat(client.getDataConsent().acceptedAt()).isEqualTo(activatedAt);
@@ -115,7 +119,7 @@ class UserTest {
     @Test
     void shouldRejectActivationWhenCodeDoesNotMatch() {
         var client = pendingClient();
-        var command = new ActivateAccountCommand("WRONGCOD", "secret123", true, "1.0");
+        var command = new ActivateAccountCommand("WRONGCOD", CLIENT_EMAIL, "secret123", true, "1.0");
 
         assertThatThrownBy(() -> client.activate(command, HASHED, NOW))
                 .isInstanceOf(InvalidActivationCodeException.class);
@@ -143,7 +147,8 @@ class UserTest {
     @Test
     void shouldRejectActivationWhenConsentVersionIsBlank() {
         var client = pendingClient();
-        var command = new ActivateAccountCommand(client.getActivationCode().getCode(), "secret123", true, " ");
+        var command = new ActivateAccountCommand(client.getActivationCode().getCode(), CLIENT_EMAIL, "secret123",
+                true, " ");
 
         assertThatThrownBy(() -> client.activate(command, HASHED, NOW))
                 .isInstanceOf(IllegalArgumentException.class);

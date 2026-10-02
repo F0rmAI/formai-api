@@ -41,8 +41,8 @@ public class ClientQueryServiceImpl implements ClientQueryService {
     }
 
     private void showActivation(Client client) {
-        if (client.getStatus() == ClientStatus.INVITED && externalIamService.isAccountActive(client.getId())) {
-            client.activate();
+        if (client.getStatus() == ClientStatus.INVITED) {
+            externalIamService.fetchActivatedEmail(client.getId()).ifPresent(client::activate);
         }
     }
 }
