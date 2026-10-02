@@ -64,6 +64,11 @@ The IAM Context owns every FormAI account (trainers and clients) and how they ge
   activates the account from the mobile app with the code, the email they will sign in with
   (unique across accounts, `409` if taken), a password and the personal data processing consent,
   recorded with the version of the consent text and the acceptance date (Law No. 29733).
+- **Changing trainer.** From the second redemption on the email already has an account: a client
+  who redeems another trainer's code with their email and their current password keeps the same
+  account, which becomes active again and moves to that trainer with all its history. A wrong
+  password answers the same `409` as a taken email. A deactivated client can reset the password
+  first; that does not let them sign in until they join a trainer again.
 - **Password reset by email.** A request issues a one-time link token valid for 30
   minutes, and only its SHA-256 hash is stored. The request always answers the same
   message, whether the email exists or not.
@@ -104,6 +109,9 @@ includes the following features:
 - Renew the activation code of a client who has not activated the account yet.
 - List, search by name and filter by status the trainer's own clients; rename a client.
 - Deactivate a client: the account can no longer sign in and the history is kept.
+- Move a client to another trainer when the client redeems that trainer's activation code with
+  their own account: the same record, with its body profile, weight history and workouts, changes
+  trainer, and the previous trainer no longer sees it. It also brings back a deactivated client.
 - Let the signed-in client read their own name and email (`GET /client-profiles/me`), so the
   mobile app can greet them by name.
 - Record the body profile (goal, height between 100 and 250 cm, weight above 0 kg,
@@ -118,7 +126,8 @@ It also exposes an Open Host Service (OHS) for in-process communication with oth
 It relies on an anti-corruption layer (ACL) to consume the IAM Context, translating its
 contract into this context's own model. It reacts to the `UserRegistered` domain event
 published by the IAM Context to register the trainer, and to `AccountActivated` to make the
-client `ACTIVE`, keeping both contexts decoupled. It publishes `ClientDeactivated`.
+client `ACTIVE`, and to `ClientAccountTransferred` to move the client to the new trainer, keeping
+both contexts decoupled. It publishes `ClientDeactivated` and `ClientTransferred`.
 
 ### Planning Context
 
@@ -134,9 +143,9 @@ includes the following features:
 - Create routines with sessions and prescribed exercises (sets, reps, target load, rest),
   starting as `DRAFT`, and duplicate them.
 - Revise a routine: every change adds a version with its date and author.
-- Assign a routine to one or several active clients from a start date, closing the previous
-  assignment. A routine with no open assignment becomes `CLOSED` and can be assigned again
-  without duplicating it.
+- Assign a routine to one or several active clients from a start date and with the days of the
+  week they train (every day when omitted), closing the previous assignment. A routine with no
+  open assignment becomes `CLOSED` and can be assigned again without duplicating it.
 
 It also exposes an Open Host Service (OHS) for in-process communication with other contexts,
 `planning.interfaces.acl.PlanningContextFacade`, offering the following capabilities:
@@ -145,7 +154,8 @@ It also exposes an Open Host Service (OHS) for in-process communication with oth
 
 It relies on an anti-corruption layer (ACL) to consume the Clients Context, translating its
 contract into this context's own model. It reacts to the `ClientDeactivated` domain event
-published by the Clients Context to close the client's assignment, keeping both contexts
+published by the Clients Context to close the client's assignment, and to `ClientTransferred` to
+close it and hand the assignment history over to the new trainer, keeping both contexts
 decoupled. It publishes `RoutineAssigned`, `RoutineUpdated` and `AssignmentClosed`.
 
 ### Tracking Context
@@ -155,10 +165,13 @@ includes the following features:
 
 - Show the client's current routine and today's session, with every session's detail.
 - Record load and reps per set, correct a set without duplicating it, and finish a session as
-  `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED`.
-- Schedule today's session as soon as a routine starting today is assigned, then every day with
+  `COMPLETED` when every prescribed set of every exercise is recorded or, once confirmed,
+  `PARTIAL`. The daily job closes yesterday's unfinished sessions: `SKIPPED` without records,
+  otherwise `COMPLETED` or `PARTIAL` on the client's behalf.
+- Schedule a session only on the training days of the assignment, so rest days never count as
+  skipped: as soon as a routine starting today is assigned, then every day with
   `WorkoutSessionDailyJob`, which also runs once on startup to catch up a cron missed while the
-  application was down.
+  application was down. An untouched session of a routine that stops applying that day is dropped.
 - Workout history, most recent first, with volume, per-set detail and a date filter, for the
   client and for the client's trainer.
 - Trainer client list with each client's current routine and last workout date.
@@ -392,7 +405,7 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 User stories of the requirements specification (`FormAI_Requirements_Specification.md`) that are
 ready to use. New development starts from this table.
 
-The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 and US-034;
+The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 to US-036;
 all of them are delivered. US-018 and US-030 belong to the final increment (TB2) and are delivered
 ahead of it, US-030 partially (see below).
 
@@ -403,21 +416,23 @@ ahead of it, US-030 partially (see below).
 | US-003 | As a trainer, register a client and show their activation code on screen | `POST /api/v1/clients` · `POST /api/v1/clients/{id}/activation-codes` | Registers the client as `INVITED` with the name only (no email) and a 72-hour activation code, and renews it, invalidating the previous one |
 | US-004 | As a client, activate my account with the code from my trainer | `POST /api/v1/activation-code-verifications` · `POST /api/v1/account-activations` | Checks that the code exists and has not expired, then activates the account with a valid code, the email to sign in with, a password and the data processing consent with the version of its text |
 | US-005 | As a trainer or client, reset my password from my email | `POST /api/v1/password-reset-requests` · `POST /api/v1/password-resets` | Emails a one-time link valid for 30 minutes through Brevo, answers the same message whether the email exists or not, and rejects a used or expired link |
-| US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history |
+| US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history until the client joins another trainer |
 | US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
 | US-008 | As a trainer, create routines with sessions, exercises, sets, reps and loads | `POST /api/v1/routines` · `GET /api/v1/routines?page&size` · `GET /api/v1/routines/{id}` · `POST /api/v1/routines/{id}/duplicates` | Creates routines as `DRAFT`, rejects invalid prescriptions and duplicates a routine without its clients |
 | US-009 | As a trainer, keep my own exercise catalog | `POST /api/v1/exercises` · `GET /api/v1/exercises?search&status&page&size` · `GET /api/v1/exercises/{id}` · `DELETE /api/v1/exercises/{id}` · `POST /api/v1/exercises/{id}/archivals` | Creates exercises without duplicate names, and only archives an exercise a routine uses |
-| US-010 | As a trainer, assign a routine to one or several clients | `POST /api/v1/routines/{id}/assignments` · `GET /api/v1/clients/{id}/assignments` | Assigns the routine to active clients from a start date, closing their previous assignment |
+| US-010 | As a trainer, assign a routine to one or several clients | `POST /api/v1/routines/{id}/assignments` · `GET /api/v1/clients/{id}/assignments` | Assigns the routine to active clients from a start date and with their training days (`trainingDays`, every day when omitted), closing their previous assignment |
 | US-011 | As a trainer, modify the routine assigned to a client | `PUT /api/v1/routines/{id}` · `GET /api/v1/routines/{id}/versions` | Saves every change as a new version with its date and author, leaving past workouts untouched |
-| US-012 | As a client, see my current routine and pick today's session or any other | `GET /api/v1/active-routines/me` | Shows today's session and every session of the current routine, or `404` when none is assigned |
+| US-012 | As a client, see my current routine and pick today's session or any other | `GET /api/v1/active-routines/me` | Shows today's session, the training days and every session of the current routine; no session of the day on a rest day, and `404` when no routine is assigned |
 | US-013 | As a client, record the load and reps of each set | `POST /api/v1/workout-sessions/{id}/sets` · `POST /api/v1/workout-sessions/{id}/corrections` | Records each set with its date and time, rejects invalid values and corrects a set without duplicating it |
-| US-014 | As a client, finish my session and see its compliance status | `POST /api/v1/workout-sessions/{id}/completions` | Finishes the session as `COMPLETED` or, once confirmed, `PARTIAL`; the daily job marks unrecorded sessions `SKIPPED` |
+| US-014 | As a client, finish my session and see its compliance status | `POST /api/v1/workout-sessions/{id}/completions` | Finishes the session as `COMPLETED` when every prescribed set is recorded or, once confirmed, `PARTIAL`; the daily job closes unfinished sessions as `SKIPPED`, `PARTIAL` or `COMPLETED` |
 | US-015 | As a client, check my workout history | `GET /api/v1/workout-sessions?from&to&page&size` · `GET /api/v1/workout-sessions/{id}` | Lists my sessions newest first with status and volume, filters by dates and shows each set |
 | US-016 | As a trainer, review the workouts each client recorded | `GET /api/v1/clients/{id}/workout-sessions?from&to&page&size` | Shows a client's sessions with status and per-set detail; another trainer's client answers `403` |
 | US-017 | As a trainer, see each client's adherence and basic metrics | `GET /api/v1/clients/{id}/progress-reports?from&to` | Returns adherence, sessions by status, and each exercise's heaviest load and volume in its first and last session; 0 % when there is no data |
 | US-018 | As a trainer or client, see load and volume progress charts | `GET /api/v1/progress-charts/me?exerciseId&weeks` · `GET /api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Returns heaviest load and volume per date over 4, 8 or 12 weeks, flagging when there is not enough data |
 | US-033 | As a trainer, restore an archived exercise of my catalog | `POST /api/v1/exercises/{id}/restorations` | Makes the exercise available again for new routines |
 | US-034 | As a trainer, assign a closed routine again, adjusting it if needed | `POST /api/v1/routines/{id}/assignments` · `PUT /api/v1/routines/{id}` | A routine with no open assignment becomes `CLOSED`; assigning it again reopens it without duplicating it, and editing it first adds a version |
+| US-035 | As a client, join another trainer keeping my account and my history | `POST /api/v1/account-activations` | Redeeming another trainer's code with my email and my current password moves my account, body profile and workouts to that trainer and closes my previous assignment; a wrong password answers `409` |
+| US-036 | As a client, see my name and email in the app | `GET /api/v1/client-profiles/me` | Returns the signed-in client's own name and email |
 
 Partially delivered: **US-030** (link exercises to published machines,
 `PUT /api/v1/exercises/{id}/machine-link`) answers `422` until the machine catalog exists.
@@ -495,7 +510,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 424 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 459 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
