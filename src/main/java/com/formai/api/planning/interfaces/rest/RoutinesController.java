@@ -177,12 +177,15 @@ public class RoutinesController {
 
     @Operation(summary = "Assign a routine to clients",
             description = "Assigns the routine from the start date to each client listed, closing the routine " +
-                    "each of them had until then. Clients are assigned one by one: if one fails, those before it " +
-                    "stay assigned and the response explains the failure.")
+                    "each of them had until then. trainingDays are the days of the week they train (MONDAY … " +
+                    "SUNDAY; every day when omitted): a session is scheduled only on those days. Clients are " +
+                    "assigned one by one: if one fails, those before it stay assigned and the response explains " +
+                    "the failure.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "One current assignment per client",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = AssignmentResource.class)))),
-            @ApiResponse(responseCode = "400", description = "No clients or no start date", content = @Content),
+            @ApiResponse(responseCode = "400", description = "No clients, no start date, or an unknown training day",
+                    content = @Content),
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine, or a client that is not yours",
                     content = @Content),

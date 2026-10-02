@@ -8,6 +8,7 @@ import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.commands.DeactivateClientCommand;
 import com.formai.api.clients.domain.model.commands.RegisterClientCommand;
 import com.formai.api.clients.domain.model.commands.RenewActivationCodeCommand;
+import com.formai.api.clients.domain.model.commands.TransferClientCommand;
 import com.formai.api.clients.domain.model.commands.UpdateBodyProfileCommand;
 import com.formai.api.clients.domain.model.commands.UpdateClientCommand;
 import com.formai.api.clients.domain.model.entities.BodyProfile;
@@ -15,6 +16,7 @@ import com.formai.api.clients.domain.model.events.BodyWeightRecorded;
 import com.formai.api.clients.domain.model.events.ClientActivated;
 import com.formai.api.clients.domain.model.events.ClientDeactivated;
 import com.formai.api.clients.domain.model.events.ClientRegistered;
+import com.formai.api.clients.domain.model.events.ClientTransferred;
 import com.formai.api.clients.domain.model.valueobjects.ActivationTicket;
 import com.formai.api.clients.domain.model.valueobjects.ClientId;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
@@ -81,6 +83,26 @@ public class ClientCommandServiceImpl implements ClientCommandService {
         clientRepository.findById(command.clientId())
                 .filter(client -> client.getStatus() == ClientStatus.INVITED)
                 .ifPresent(client -> activate(client, command.email()));
+    }
+
+    // The invited record only carried the new trainer's invitation: the client's own record takes
+    // its trainer and the invited one is removed, so the trainer sees one client, with its history.
+    @Override
+    @Transactional
+    public void handle(TransferClientCommand command) {
+        var invited = clientRepository.findById(command.invitedClientId());
+        var existing = clientRepository.findById(command.existingClientId());
+        if (invited.isEmpty() || existing.isEmpty()) {
+            return;
+        }
+        var client = existing.get();
+        var previousHolderId = client.getHolderId();
+        client.transferTo(invited.get().getHolderId());
+        var saved = clientRepository.save(client);
+        clientRepository.delete(command.invitedClientId());
+
+        eventPublisher.publishEvent(new ClientTransferred(saved.getId().value(), previousHolderId,
+                saved.getHolderId()));
     }
 
     @Override

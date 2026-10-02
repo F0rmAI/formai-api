@@ -19,6 +19,7 @@ import com.formai.api.iam.domain.model.entities.PasswordResetToken;
 import com.formai.api.iam.domain.model.events.AccountActivated;
 import com.formai.api.iam.domain.model.events.AccountLocked;
 import com.formai.api.iam.domain.model.events.ActivationCodeIssued;
+import com.formai.api.iam.domain.model.events.ClientAccountTransferred;
 import com.formai.api.iam.domain.model.events.PasswordResetRequested;
 import com.formai.api.iam.domain.model.events.UserRegistered;
 import com.formai.api.iam.domain.model.valueobjects.AccountStatus;
@@ -291,7 +292,6 @@ class UserCommandServiceImplTest {
         var client = pendingClient();
         var code = client.getActivationCode().getCode();
         when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(client));
-        when(hashingService.hash("secret123")).thenReturn("hashed");
         when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(pendingClient()));
 
         // Act & Assert
@@ -395,5 +395,82 @@ class UserCommandServiceImplTest {
 
         assertThat(user.getStatus()).isEqualTo(AccountStatus.DISABLED);
         verify(userRepository).save(user);
+    }
+
+    private static User activeClient() {
+        var client = pendingClient();
+        client.activate(new ActivateAccountCommand(client.getActivationCode().getCode(), CLIENT_EMAIL, "secret123",
+                true, "1.0"), new HashedPassword("stored-hash"), Instant.now());
+        return client;
+    }
+
+    @Test
+    void shouldMoveTheExistingAccountToTheNewTrainerWhenThePasswordMatches() {
+        // Arrange: a client deactivated by the previous trainer redeems the invitation of a new one
+        var existing = activeClient();
+        existing.disable();
+        var invited = pendingClient();
+        var code = invited.getActivationCode().getCode();
+        when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(invited));
+        when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(existing));
+        when(hashingService.matches("secret123", "stored-hash")).thenReturn(true);
+        saveReturnsArgument();
+
+        // Act
+        var result = commandService.handle(new ActivateAccountCommand(code, CLIENT_EMAIL, "secret123", true, "2.0"));
+
+        // Assert
+        assertThat(result).containsSame(existing);
+        assertThat(existing.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(existing.getDataConsent().version()).isEqualTo("2.0");
+        assertThat(invited.getStatus()).isEqualTo(AccountStatus.DISABLED);
+        assertThat(invited.getEmail()).isNull();
+        assertThat(invited.getActivationCode().getUsedAt()).isNotNull();
+        assertThat(publishedEvent()).isInstanceOfSatisfying(ClientAccountTransferred.class, event -> {
+            assertThat(event.invitedUserId()).isEqualTo(invited.getId());
+            assertThat(event.existingUserId()).isEqualTo(existing.getId());
+        });
+    }
+
+    @Test
+    void shouldRejectTheTransferWhenThePasswordIsNotTheOneOfTheExistingAccount() {
+        var existing = activeClient();
+        var invited = pendingClient();
+        var code = invited.getActivationCode().getCode();
+        when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(invited));
+        when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(existing));
+        when(hashingService.matches("another123", "stored-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> commandService.handle(
+                new ActivateAccountCommand(code, CLIENT_EMAIL, "another123", true, "1.0")))
+                .isInstanceOf(EmailAlreadyRegisteredException.class);
+        verify(userRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void shouldRejectTheTransferWhenTheEmailBelongsToATrainer() {
+        var invited = pendingClient();
+        var code = invited.getActivationCode().getCode();
+        when(userRepository.findByActivationCode(code)).thenReturn(Optional.of(invited));
+        when(userRepository.findByEmail(TRAINER_EMAIL)).thenReturn(Optional.of(trainer()));
+
+        assertThatThrownBy(() -> commandService.handle(
+                new ActivateAccountCommand(code, TRAINER_EMAIL, "secret123", true, "1.0")))
+                .isInstanceOf(EmailAlreadyRegisteredException.class);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldLetADeactivatedClientRequestAPasswordReset() {
+        var client = activeClient();
+        client.disable();
+        when(userRepository.findByEmail(CLIENT_EMAIL)).thenReturn(Optional.of(client));
+
+        commandService.handle(new RequestPasswordResetCommand(CLIENT_EMAIL));
+
+        verify(userRepository).save(client);
+        assertThat(publishedEvent()).isInstanceOf(PasswordResetRequested.class);
+        assertThat(client.getStatus()).isEqualTo(AccountStatus.DISABLED);
     }
 }

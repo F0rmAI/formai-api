@@ -6,13 +6,17 @@ import com.formai.api.clients.domain.exceptions.ClientNotFoundException;
 import com.formai.api.clients.domain.model.aggregates.Client;
 import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.commands.DeactivateClientCommand;
+import com.formai.api.clients.domain.model.commands.RegisterClientCommand;
 import com.formai.api.clients.domain.model.commands.RenewActivationCodeCommand;
+import com.formai.api.clients.domain.model.commands.TransferClientCommand;
 import com.formai.api.clients.domain.model.commands.UpdateClientCommand;
 import com.formai.api.clients.domain.model.events.BodyWeightRecorded;
 import com.formai.api.clients.domain.model.events.ClientActivated;
 import com.formai.api.clients.domain.model.events.ClientDeactivated;
 import com.formai.api.clients.domain.model.events.ClientRegistered;
+import com.formai.api.clients.domain.model.events.ClientTransferred;
 import com.formai.api.clients.domain.model.valueobjects.ActivationTicket;
+import com.formai.api.clients.domain.model.valueobjects.ClientId;
 import com.formai.api.clients.domain.model.valueobjects.ClientStatus;
 import com.formai.api.clients.domain.model.valueobjects.FullName;
 import com.formai.api.clients.domain.repositories.ClientRepository;
@@ -26,9 +30,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.formai.api.clients.ClientsTestData.CLIENT_EMAIL;
 import static com.formai.api.clients.ClientsTestData.CLIENT_ID;
+import static com.formai.api.clients.ClientsTestData.CODE_EXPIRES_AT;
 import static com.formai.api.clients.ClientsTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.clients.ClientsTestData.activeClient;
 import static com.formai.api.clients.ClientsTestData.bodyProfileCommand;
@@ -195,5 +201,39 @@ class ClientCommandServiceImplTest {
         commandService.handle(bodyProfileCommand("80.5"));
 
         verify(eventPublisher, never()).publishEvent(any(BodyWeightRecorded.class));
+    }
+
+    @Test
+    void shouldGiveTheExistingClientToTheNewTrainerAndRemoveTheInvitedRecord() {
+        // Arrange: the new trainer registered an invited record; the client already had their own
+        var newTrainer = "33333333-3333-3333-3333-333333333333";
+        var invitedId = new ClientId(UUID.randomUUID());
+        var invited = Client.register(new RegisterClientCommand(newTrainer, new FullName("Luis Ramos")),
+                new ActivationTicket(invitedId, "WXYZ6789", CODE_EXPIRES_AT));
+        var existing = activeClient();
+        when(clientRepository.findById(invitedId)).thenReturn(Optional.of(invited));
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(existing));
+        savesReturnTheClient();
+
+        // Act
+        commandService.handle(new TransferClientCommand(invitedId, CLIENT_ID));
+
+        // Assert
+        assertThat(existing.getHolderId()).isEqualTo(newTrainer);
+        verify(clientRepository).save(existing);
+        verify(clientRepository).delete(invitedId);
+        verify(eventPublisher).publishEvent(new ClientTransferred(CLIENT_ID.value(), TRAINER_HOLDER_ID, newTrainer));
+    }
+
+    @Test
+    void shouldDoNothingWhenTheRecordsOfATransferAreMissing() {
+        var invitedId = new ClientId(UUID.randomUUID());
+        when(clientRepository.findById(invitedId)).thenReturn(Optional.empty());
+        when(clientRepository.findById(CLIENT_ID)).thenReturn(Optional.of(activeClient()));
+
+        commandService.handle(new TransferClientCommand(invitedId, CLIENT_ID));
+
+        verify(clientRepository, never()).save(any(Client.class));
+        verify(clientRepository, never()).delete(any(ClientId.class));
     }
 }

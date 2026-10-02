@@ -2,7 +2,7 @@ package com.formai.api.tracking.application.internal.jobs;
 
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
-import com.formai.api.tracking.domain.model.commands.SkipOverdueWorkoutSessionsCommand;
+import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.queries.GetActiveRoutinesOnQuery;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
@@ -52,7 +52,7 @@ public class WorkoutSessionDailyJob {
     }
 
     public void runFor(LocalDate today) {
-        workoutSessionCommandService.handle(new SkipOverdueWorkoutSessionsCommand(today));
+        workoutSessionCommandService.handle(new CloseOverdueWorkoutSessionsCommand(today));
         for (var routine : activeRoutineQueryService.handle(new GetActiveRoutinesOnQuery(today))) {
             var clientId = routine.getClientId();
             try {
@@ -61,7 +61,7 @@ public class WorkoutSessionDailyJob {
                     activeRoutineCommandService.handle(new EndActiveRoutineCommand(clientId, today.minusDays(1)));
                     continue;
                 }
-                if (synced.get().isActiveOn(today)) {
+                if (synced.get().trainsOn(today)) {
                     workoutSessionCommandService.handle(new ScheduleWorkoutSessionCommand(clientId, today));
                 }
             } catch (RuntimeException ex) {

@@ -4,7 +4,7 @@ import com.formai.api.tracking.domain.exceptions.ActiveRoutineNotFoundException;
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
-import com.formai.api.tracking.domain.model.commands.SkipOverdueWorkoutSessionsCommand;
+import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.queries.GetActiveRoutinesOnQuery;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
@@ -19,6 +19,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.DayOfWeek;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +72,7 @@ class WorkoutSessionDailyJobTest {
 
         // Assert
         InOrder order = inOrder(workoutSessionCommandService, activeRoutineCommandService);
-        order.verify(workoutSessionCommandService).handle(new SkipOverdueWorkoutSessionsCommand(TODAY));
+        order.verify(workoutSessionCommandService).handle(new CloseOverdueWorkoutSessionsCommand(TODAY));
         order.verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(CLIENT_ID));
         order.verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
     }
@@ -89,7 +91,7 @@ class WorkoutSessionDailyJobTest {
     @Test
     void shouldNotScheduleARoutineBeforeItsStartDate() {
         var startsLater = activeRoutine();
-        startsLater.resync(new PlannedRoutine(ROUTINE_ID, "Next block", 1, TODAY.plusDays(3),
+        startsLater.resync(new PlannedRoutine(ROUTINE_ID, "Next block", 1, TODAY.plusDays(3), EnumSet.allOf(DayOfWeek.class),
                 startsLater.getDays()));
         when(activeRoutineQueryService.handle(new GetActiveRoutinesOnQuery(TODAY))).thenReturn(List.of(activeRoutine()));
         when(activeRoutineCommandService.handle(new SyncActiveRoutineCommand(CLIENT_ID)))
@@ -123,14 +125,26 @@ class WorkoutSessionDailyJobTest {
     void shouldRunTheJobOnStartupToCatchUpAMissedCron() {
         job.runOnStartup();
 
-        verify(workoutSessionCommandService).handle(any(SkipOverdueWorkoutSessionsCommand.class));
+        verify(workoutSessionCommandService).handle(any(CloseOverdueWorkoutSessionsCommand.class));
     }
 
     @Test
     void shouldNotStopTheApplicationWhenTheStartupCatchUpFails() {
         doThrow(new IllegalStateException("database unavailable"))
-                .when(workoutSessionCommandService).handle(any(SkipOverdueWorkoutSessionsCommand.class));
+                .when(workoutSessionCommandService).handle(any(CloseOverdueWorkoutSessionsCommand.class));
 
         assertThatCode(() -> job.runOnStartup()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shouldNotScheduleOnARestDay() {
+        var routine = activeRoutine();
+        routine.setTrainingDays(EnumSet.of(TODAY.plusDays(1).getDayOfWeek()));
+        when(activeRoutineQueryService.handle(new GetActiveRoutinesOnQuery(TODAY))).thenReturn(List.of(routine));
+        when(activeRoutineCommandService.handle(new SyncActiveRoutineCommand(CLIENT_ID))).thenReturn(Optional.of(routine));
+
+        job.runFor(TODAY);
+
+        verify(workoutSessionCommandService, never()).handle(any(ScheduleWorkoutSessionCommand.class));
     }
 }

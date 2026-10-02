@@ -12,7 +12,9 @@ import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineId;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,7 +44,7 @@ public final class TrackingTestData {
     }
 
     public static PlannedRoutine plannedRoutine(int version) {
-        return new PlannedRoutine(ROUTINE_ID, "Strength 12 weeks", version, START_DATE, List.of(LEGS_DAY, BACK_DAY));
+        return new PlannedRoutine(ROUTINE_ID, "Strength 12 weeks", version, START_DATE, EnumSet.allOf(DayOfWeek.class), List.of(LEGS_DAY, BACK_DAY));
     }
 
     public static ActiveRoutine activeRoutine() {

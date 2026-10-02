@@ -5,6 +5,7 @@ import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
 import com.formai.api.planning.domain.model.queries.GetRoutineByIdQuery;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.services.ClientPlanQueryService;
 import com.formai.api.planning.domain.services.RoutineQueryService;
 import com.formai.api.planning.interfaces.rest.transform.ClientPlanAssemblerImpl;
@@ -55,8 +56,8 @@ class AssignmentsControllerTest {
     void shouldListTheClientsAssignmentsMostRecentFirst() throws Exception {
         var current = routine();
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE));
-        plan.assign(new AssignRoutineCommand(current.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE.plusDays(30)));
+        plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
+        plan.assign(new AssignRoutineCommand(current.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE.plusDays(30), TrainingDays.everyDay()));
         when(clientPlanQueryService.handle(argThat((GetClientPlanQuery query) ->
                 query.clientId().equals(CLIENT_ID) && query.holderId().equals(TRAINER_HOLDER_ID))))
                 .thenReturn(Optional.of(plan));

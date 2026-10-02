@@ -2,60 +2,52 @@
 
 Inter-session project memory. This file contains about 50 lines: summarize or remove content that no longer adds value.
 
-## Current status (2026-10-01)
-- The TP (MVP, Sprints 1–2) backend is complete: US-001…US-017 plus US-033/US-034 are delivered. US-005
-  sends the reset email through Brevo's SMTP relay (branch `feature/brevo-email-delivery`, verified with a
-  real send). US-004 also has `POST /activation-code-verifications` (FE-MOB-003): the app checks the code
-  before asking for a password, without redeeming it. The trainer registers a client with the name only;
-  the client sets the email on activation (branch `fix/register-client-email`). `GET /client-profiles/me` gives the
-  signed-in client their own name and email (the app greets by name). Suite: 424 tests. Audit against the
-  `qs-monolith-serv` canon: ~85 % (2026-10-01).
+## Current status (2026-10-02)
+- The TP (MVP, Sprints 1–2) backend is complete on branch `feature/mvp-closure` (not merged yet): US-001…US-017
+  and US-033…US-036 are delivered. Suite: 459 tests. Spec is at version 0.4.0.
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
 - Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
   `com.formai.api`); never edit the `.puml`. `FORMAI_API_REPO=<this repo> ./build.sh` rebuilds TP and TF and
-  compares them with the code (TF 414/414; TP lacks only the 5 US-030 classes, `[TB2]` on purpose).
+  compares them with the code.
 
 ## Decisions (and why)
-- Swagger tags by purpose, defined once in `shared/interfaces/rest/ApiTags`: controllers of several modules
-  share a tag, and differing descriptions made springdoc emit conflicting duplicates.
-- Today's `WorkoutSession` is scheduled on assignment, by the 00:05 job and on startup: with only the cron, a
-  routine starting today, or a server that was down at 00:05, left the client with nothing to record (FR-010).
-- Sessions: 30-min access JWT + 7-day rotating refresh cookie with theft detection (NFR-007); bcrypt cost 12
-  (NFR-005); consent stored with the text version (NFR-021; accounts activated before are marked `legacy`).
-- `/clients/{id}/assignments` answers 403 for another trainer's client, like tracking's routes (FR-016).
-- `AGENTS.md` is the single instruction file; `CLAUDE.md` only imports it and this file.
-- The client's email is chosen by the client on activation, not typed by the trainer: `iam.users.email` and
-  `clients.clients.email` are nullable until then (iam V6, clients V2) and `AccountActivated` carries the email.
-  The web form must stop asking for it (the API ignores it if sent).
-- Email goes through Brevo over SMTP (not its HTTP API, as the C4 said): the team's Brevo setup is SMTP and
-  Spring's `JavaMailSender` needs no vendor SDK. Failed emails are retried up to 5 times, to protect the
-  daily quota and because the reset link expires in 30 minutes anyway. The email body is redacted once the
-  delivery is closed, so the reset link is not kept in the database.
+- The trainer registers a client with the name only; the client chooses the email on activation. The pending
+  account only carries the activation code (iam V6, clients V2).
+- Changing trainer keeps the account: from the second redemption on, the code of another trainer redeemed
+  with the client's email and current password moves the client record, and so all its history, to that
+  trainer. The password is the proof of ownership; without it the answer is the usual 409.
+- Training days per assignment (planning V3, tracking V2): a session exists only on those days, so rest days
+  no longer count as skipped and adherence means what the trainer expects.
+- COMPLETED needs every prescribed set; the daily closing ends sessions with records as PARTIAL or COMPLETED,
+  so every past session has a final status.
+- Swagger tags by purpose in `shared/interfaces/rest/ApiTags`; `AGENTS.md` is the single instruction file.
+- Sessions: 30-min JWT + 7-day rotating refresh cookie; bcrypt cost 12; consent stored with its text version.
+- Email through Brevo over SMTP, retried up to 5 times; the body is redacted once the delivery is closed.
 
 ## Lessons learned and mistakes to avoid
 - Controller tests: use `.with(user(<real id>).roles(...))`, not `@WithMockUser` (holderId = `getName()`).
 - An exception in an `ApplicationReadyEvent` listener aborts startup: catch it.
-- Two eager `List` collections on one entity need `@OrderColumn` (multiple bags).
-- Same simple class name in two modules clashes as a bean name: name the bean explicitly.
-- Local runs need Docker Desktop up; restarting it may leave the database empty (Flyway rebuilds it).
-- A `try/catch` inside a `@Transactional` listener does not stop the failure: the rollback resurfaces as
-  `UnexpectedRollbackException`. Catch outside the transaction (`TransactionTemplate`).
+- A `try/catch` inside a `@Transactional` listener does not stop the failure: catch outside the transaction.
+- Two eager `List` collections on one entity need `@OrderColumn`; same class name in two modules needs an
+  explicit bean name.
+- Unit tests did not catch two date bugs that a real run did: an assignment closed "today" still applies
+  today, and the first assignment in effect is not the latest. Run the flow against the API after such changes.
+- Stop the running API before `mvn test`: both write `target/` and the suite fails to discover tests.
+- Local runs need Docker Desktop up. To test without sending emails: `NOTIFICATIONS_DISPATCHER_DELAY=PT2H`.
 
-## Open product questions (need a team decision)
-- Rest days: a session is scheduled every calendar day, so unrecorded rest days count as SKIPPED and lower
-  adherence. Option: training days per assignment.
-- COMPLETED counts an exercise as done with one recorded set; should it require every prescribed set?
-- A session with records that is never finished stays PENDING; FR-014 does not say how to close it.
-- Handlers without self-healing (stated in their comments): `UserRegistered`→Trainer (iam does not keep the
-  name), `ClientDeactivated`→close assignment, and tracking's `RoutineAssigned` sync (no sessions until reassigned).
+## Known limits (accepted)
+- After a transfer, the previous trainer's routines appear without a name in the assignment history.
+- A routine assigned the same day as a transfer stays visible until the new trainer assigns one.
+- Handlers without self-healing (see their comments): `UserRegistered`→Trainer, `ClientDeactivated`→close
+  assignment, tracking's `RoutineAssigned` sync, and `ClientAccountTransferred` (the trainer invites again).
 
 ## Next steps (to operate the MVP)
+- Front ends: the web must send `trainingDays` when assigning and stop asking for the client's email; it
+  needs a `/password-reset` page. The app must send email and `consentVersion` on activation.
 - Set the `SMTP_*` variables in the demo environment and in every teammate's `.env`.
 - Deployment: Dockerfile + `backend` service in compose, Caddy with TLS and a subdomain, on the Linux VM.
 - Daily Postgres backup with 7-day retention and one tested restore; external monitor on `/actuator/health`.
 - Quality evidence: k6 (P95 < 300 ms), OWASP ZAP baseline, JaCoCo ≥ 70 % on domain/application.
-- Audit backlog: clients↔iam share one transaction on client registration/deactivation; iam and tracking
-  command services lack `@Transactional` (sign-in must keep its failed-attempt count on error); ArchUnit
-  layered rule; tests with a real JWT and a context-load test; SMTP send inside the DB transaction.
-- The web front end needs a `/password-reset` page: the emailed link points to `PASSWORD_RESET_URL`.
+- Audit backlog: clients↔iam share one transaction; iam and tracking command services lack `@Transactional`;
+  ArchUnit layered rule; tests with a real JWT and a context-load test; SMTP send inside the DB transaction.

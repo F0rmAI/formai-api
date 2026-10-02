@@ -1,10 +1,13 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
+import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static com.formai.api.planning.PlanningTestData.CLIENT_ID;
@@ -19,7 +22,7 @@ class ClientPlanTest {
     private static final RoutineId SECOND_ROUTINE = new RoutineId(UUID.randomUUID());
 
     private static AssignRoutineCommand assign(RoutineId routineId, LocalDate startDate) {
-        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate);
+        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate, TrainingDays.everyDay());
     }
 
     @Test
@@ -74,5 +77,30 @@ class ClientPlanTest {
 
         assertThat(assignment.getPeriod().endDate()).isEqualTo(START_DATE.plusDays(10));
         assertThat(plan.currentAssignment()).isEmpty();
+    }
+
+    @Test
+    void shouldKeepTheTrainingDaysOfTheAssignment() {
+        var plan = emptyPlan();
+        var mondayAndThursday = TrainingDays.ofNames(List.of("MONDAY", "THURSDAY"));
+
+        var assignment = plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID,
+                TRAINER_HOLDER_ID, START_DATE, mondayAndThursday));
+
+        assertThat(assignment.getTrainingDays().names()).containsExactly("MONDAY", "THURSDAY");
+    }
+
+    @Test
+    void shouldCloseTheCurrentAssignmentAndFollowTheNewTrainerWhenTransferred() {
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(new RoutineId(UUID.randomUUID()), CLIENT_ID, TRAINER_HOLDER_ID,
+                START_DATE, TrainingDays.everyDay()));
+        var newTrainer = "33333333-3333-3333-3333-333333333333";
+
+        plan.transferTo(new TransferClientPlanCommand(CLIENT_ID, newTrainer, START_DATE.plusDays(10)));
+
+        assertThat(plan.getHolderId()).isEqualTo(newTrainer);
+        assertThat(plan.currentAssignment()).isEmpty();
+        assertThat(plan.getAssignments().getFirst().getPeriod().endDate()).isEqualTo(START_DATE.plusDays(9));
     }
 }

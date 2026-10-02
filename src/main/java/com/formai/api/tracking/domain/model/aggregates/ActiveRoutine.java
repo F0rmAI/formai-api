@@ -8,10 +8,12 @@ import com.formai.api.tracking.domain.model.valueobjects.PlannedRoutine;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineId;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class ActiveRoutine {
@@ -23,6 +25,7 @@ public class ActiveRoutine {
     private int version;
     private LocalDate startDate;
     private LocalDate endDate;
+    private Set<DayOfWeek> trainingDays;
     private List<RoutineDay> days;
 
     // public: required by MapStruct, which generates its mapper impl in a different package.
@@ -43,6 +46,7 @@ public class ActiveRoutine {
         this.version = plan.version();
         this.startDate = plan.startDate();
         this.endDate = null;
+        this.trainingDays = plan.trainingDays();
         this.days = plan.days();
     }
 
@@ -59,6 +63,12 @@ public class ActiveRoutine {
 
     public boolean isActiveOn(LocalDate date) {
         return !date.isBefore(startDate) && (endDate == null || !date.isAfter(endDate));
+    }
+
+    // A session is scheduled only on the training days of the assignment: the rest days in
+    // between are not sessions, so they never count as skipped.
+    public boolean trainsOn(LocalDate date) {
+        return isActiveOn(date) && trainingDays.contains(date.getDayOfWeek());
     }
 
     public ActiveRoutineId getId() {
@@ -123,5 +133,13 @@ public class ActiveRoutine {
 
     public void setDays(List<RoutineDay> days) {
         this.days = days;
+    }
+
+    public Set<DayOfWeek> getTrainingDays() {
+        return trainingDays;
+    }
+
+    public void setTrainingDays(Set<DayOfWeek> trainingDays) {
+        this.trainingDays = trainingDays;
     }
 }

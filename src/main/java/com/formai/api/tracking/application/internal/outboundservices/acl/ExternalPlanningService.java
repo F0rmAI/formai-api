@@ -12,7 +12,9 @@ import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineId;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ExternalPlanningService {
@@ -33,6 +35,7 @@ public class ExternalPlanningService {
                 snapshot.routineName(),
                 snapshot.version(),
                 snapshot.startDate(),
+                snapshot.trainingDays().stream().map(DayOfWeek::valueOf).collect(Collectors.toSet()),
                 snapshot.sessions().stream().map(this::toRoutineDay).toList());
     }
 

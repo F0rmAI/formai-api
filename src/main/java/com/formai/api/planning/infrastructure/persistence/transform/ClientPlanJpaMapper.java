@@ -6,12 +6,14 @@ import com.formai.api.planning.domain.model.valueobjects.AssignmentPeriod;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
 import com.formai.api.planning.domain.model.valueobjects.ClientPlanId;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.infrastructure.persistence.entities.AssignmentEmbeddable;
 import com.formai.api.planning.infrastructure.persistence.entities.ClientPlanJpaEntity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import java.util.List;
 import java.util.UUID;
 
 @Mapper(componentModel = "spring")
@@ -31,6 +33,14 @@ public interface ClientPlanJpaMapper {
     @Named("toPeriod")
     default AssignmentPeriod toPeriod(AssignmentEmbeddable embeddable) {
         return new AssignmentPeriod(embeddable.getStartDate(), embeddable.getEndDate());
+    }
+
+    default String map(TrainingDays trainingDays) {
+        return trainingDays == null ? null : String.join(",", trainingDays.names());
+    }
+
+    default TrainingDays mapTrainingDays(String value) {
+        return value == null ? null : TrainingDays.ofNames(List.of(value.split(",")));
     }
 
     default UUID map(RoutineId id) {

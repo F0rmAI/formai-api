@@ -66,4 +66,11 @@ class ClientRepositoryImplTest {
         assertThat(page.items()).hasSize(1);
         assertThat(page.totalElements()).isEqualTo(1);
     }
+
+    @Test
+    void shouldDeleteAClientById() {
+        new ClientRepositoryImpl(jpaRepository, mapper).delete(CLIENT_ID);
+
+        verify(jpaRepository).deleteById(CLIENT_ID.value());
+    }
 }

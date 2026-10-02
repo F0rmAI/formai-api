@@ -145,14 +145,15 @@ public class WorkoutSessionsController {
 
     @Operation(summary = "Finish a session",
             description = "Closes the session and returns its compliance status: COMPLETED when every " +
-                    "exercise has sets recorded, PARTIAL when some do not and confirmPartial is true.")
+                    "prescribed set of every exercise is recorded, PARTIAL when some are missing and " +
+                    "confirmPartial is true.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Session finished — returns it with its status",
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a client", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such session for this client", content = @Content),
-            @ApiResponse(responseCode = "409", description = "Already finished or skipped, or some exercises " +
-                    "have no sets and confirmPartial is false — ask the client to confirm", content = @Content)
+            @ApiResponse(responseCode = "409", description = "Already finished or skipped, or some prescribed " +
+                    "sets are missing and confirmPartial is false — ask the client to confirm", content = @Content)
     })
     @PostMapping("/workout-sessions/{id}/completions")
     public ResponseEntity<WorkoutSessionResource> finish(@PathVariable UUID id,

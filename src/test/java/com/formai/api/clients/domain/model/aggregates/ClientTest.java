@@ -143,4 +143,18 @@ class ClientTest {
         assertThat(trainer.getHolderId()).isEqualTo(TRAINER_HOLDER_ID);
         assertThat(trainer.getRegisteredAt()).isNotNull();
     }
+
+    @Test
+    void shouldMoveToTheNewTrainerActiveKeepingItsEmailAndBodyProfile() {
+        var client = activeClient();
+        client.updateBodyProfile(bodyProfileCommand("80.0"), TODAY);
+        client.deactivate();
+
+        client.transferTo("33333333-3333-3333-3333-333333333333");
+
+        assertThat(client.getHolderId()).isEqualTo("33333333-3333-3333-3333-333333333333");
+        assertThat(client.getStatus()).isEqualTo(ClientStatus.ACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
+        assertThat(client.getBodyProfile()).isPresent();
+    }
 }

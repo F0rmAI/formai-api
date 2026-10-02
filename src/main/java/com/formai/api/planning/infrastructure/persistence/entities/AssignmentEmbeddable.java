@@ -18,6 +18,10 @@ public class AssignmentEmbeddable {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    // Comma-separated java.time.DayOfWeek names, e.g. MONDAY,WEDNESDAY,FRIDAY.
+    @Column(name = "training_days", nullable = false, length = 70)
+    private String trainingDays;
+
     // public: required by MapStruct, which generates its mapper impl in a different package.
     public AssignmentEmbeddable() {
     }
@@ -44,5 +48,13 @@ public class AssignmentEmbeddable {
 
     public void setEndDate(LocalDate endDate) {
         this.endDate = endDate;
+    }
+
+    public String getTrainingDays() {
+        return trainingDays;
+    }
+
+    public void setTrainingDays(String trainingDays) {
+        this.trainingDays = trainingDays;
     }
 }

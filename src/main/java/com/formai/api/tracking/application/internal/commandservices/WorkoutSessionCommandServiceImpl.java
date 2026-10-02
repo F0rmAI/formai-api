@@ -7,12 +7,13 @@ import com.formai.api.tracking.domain.model.commands.CorrectSetCommand;
 import com.formai.api.tracking.domain.model.commands.FinishWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.RecordSetCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
-import com.formai.api.tracking.domain.model.commands.SkipOverdueWorkoutSessionsCommand;
+import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.events.SetRecorded;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionFinished;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionScheduled;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionSkipped;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.valueobjects.ComplianceStatus;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionId;
 import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import com.formai.api.tracking.domain.repositories.WorkoutSessionRepository;
@@ -20,6 +21,7 @@ import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Service
@@ -39,13 +41,26 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
 
     @Override
     public Optional<WorkoutSession> handle(ScheduleWorkoutSessionCommand command) {
+        var activeRoutine = activeRoutineRepository.findByClientId(command.clientId())
+                .filter(candidate -> candidate.isActiveOn(command.date()));
         var existing = workoutSessionRepository.findByClientIdAndScheduledFor(command.clientId(), command.date());
         if (existing.isPresent()) {
-            return existing;
+            var session = existing.get();
+            var stillApplies = activeRoutine
+                    .map(routine -> routine.trainsOn(command.date())
+                            && routine.getRoutineId().equals(session.getRoutineId()))
+                    .orElse(false);
+            if (stillApplies || !session.isUntouched()) {
+                return existing;
+            }
+            // Scheduled from a routine that no longer applies that day (replaced, ended, or now a
+            // rest day) and never used: it is dropped so it does not end up SKIPPED.
+            workoutSessionRepository.delete(session.getId());
         }
-        var routine = activeRoutineRepository.findByClientId(command.clientId())
-                .filter(candidate -> candidate.isActiveOn(command.date()))
-                .orElseThrow(ActiveRoutineNotFoundException::new);
+        var routine = activeRoutine.orElseThrow(ActiveRoutineNotFoundException::new);
+        if (!routine.trainsOn(command.date())) {
+            return Optional.empty();   // a rest day: there is no session to schedule
+        }
         var lastOrder = workoutSessionRepository.findLastFinishedByClientId(command.clientId())
                 .filter(last -> last.getRoutineId().equals(routine.getRoutineId()))
                 .map(WorkoutSession::getDayOrder);
@@ -87,15 +102,19 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
     }
 
     @Override
-    public void handle(SkipOverdueWorkoutSessionsCommand command) {
-        workoutSessionRepository.findAllPendingBefore(command.date()).stream()
-                .filter(session -> !session.hasRecords())
-                .forEach(session -> {
-                    session.skip();
-                    var saved = workoutSessionRepository.save(session);
-                    eventPublisher.publishEvent(new WorkoutSessionSkipped(saved.getId().value(),
-                            saved.getClientId().value()));
-                });
+    public void handle(CloseOverdueWorkoutSessionsCommand command) {
+        var now = Instant.now();
+        workoutSessionRepository.findAllPendingBefore(command.date()).forEach(session -> {
+            var status = session.closeOverdue(now);
+            var saved = workoutSessionRepository.save(session);
+            if (status == ComplianceStatus.SKIPPED) {
+                eventPublisher.publishEvent(new WorkoutSessionSkipped(saved.getId().value(),
+                        saved.getClientId().value()));
+            } else {
+                eventPublisher.publishEvent(new WorkoutSessionFinished(saved.getId().value(),
+                        saved.getClientId().value(), status.name()));
+            }
+        });
     }
 
     private WorkoutSession findOwnSession(WorkoutSessionId id, ClientId clientId) {

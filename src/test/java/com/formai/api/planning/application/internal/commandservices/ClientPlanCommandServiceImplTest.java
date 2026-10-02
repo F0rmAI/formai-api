@@ -7,9 +7,11 @@ import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
+import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
 import org.junit.jupiter.api.Test;
@@ -56,7 +58,7 @@ class ClientPlanCommandServiceImplTest {
     private final RoutineId routineId = routine().getId();
 
     private AssignRoutineCommand assignFrom(LocalDate startDate) {
-        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate);
+        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate, TrainingDays.everyDay());
     }
 
     private void routineAndActiveClientExist() {
@@ -85,7 +87,7 @@ class ClientPlanCommandServiceImplTest {
     void shouldCloseThePreviousAssignmentAndPublishAssignmentClosed() {
         var previousRoutine = new RoutineId(UUID.randomUUID());
         var plan = emptyPlan();
-        plan.assign(new AssignRoutineCommand(previousRoutine, CLIENT_ID, TRAINER_HOLDER_ID, START_DATE));
+        plan.assign(new AssignRoutineCommand(previousRoutine, CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TrainingDays.everyDay()));
         routineAndActiveClientExist();
         when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
 
@@ -148,5 +150,34 @@ class ClientPlanCommandServiceImplTest {
 
         verify(clientPlanRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void shouldHandThePlanOverAndCloseItsAssignmentWhenTheClientChangesTrainer() {
+        // Arrange
+        var plan = emptyPlan();
+        plan.assign(assignFrom(START_DATE));
+        var newTrainer = "33333333-3333-3333-3333-333333333333";
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(plan));
+        when(clientPlanRepository.save(any(ClientPlan.class))).thenAnswer(call -> call.getArgument(0));
+
+        // Act
+        commandService.handle(new TransferClientPlanCommand(CLIENT_ID, newTrainer, START_DATE.plusDays(5)));
+
+        // Assert
+        assertThat(plan.getHolderId()).isEqualTo(newTrainer);
+        assertThat(plan.currentAssignment()).isEmpty();
+        verify(eventPublisher).publishEvent(new AssignmentClosed(CLIENT_ID.value(), routineId.value(),
+                START_DATE.plusDays(4)));
+    }
+
+    @Test
+    void shouldDoNothingWhenATransferredClientHasNoPlan() {
+        when(clientPlanRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.empty());
+
+        commandService.handle(new TransferClientPlanCommand(CLIENT_ID, "33333333-3333-3333-3333-333333333333",
+                START_DATE));
+
+        verify(clientPlanRepository, never()).save(any(ClientPlan.class));
     }
 }

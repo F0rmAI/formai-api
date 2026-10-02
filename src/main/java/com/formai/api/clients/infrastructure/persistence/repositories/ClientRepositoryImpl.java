@@ -44,6 +44,11 @@ public class ClientRepositoryImpl implements ClientRepository {
     }
 
     @Override
+    public void delete(ClientId id) {
+        jpaRepository.deleteById(id.value());
+    }
+
+    @Override
     public ClientPage findAllByHolderId(String holderId, Optional<String> search, Optional<ClientStatus> status,
                                        Pagination pagination) {
         var pageRequest = PageRequest.of(pagination.page(), pagination.size(), BY_NAME);

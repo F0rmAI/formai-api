@@ -89,6 +89,36 @@ public class User {
     }
 
     public void activate(ActivateAccountCommand command, HashedPassword hashedPassword, Instant now) {
+        assertRedeemable(command, now);
+        this.email = command.email();
+        this.hashedPassword = hashedPassword;
+        this.status = AccountStatus.ACTIVE;
+        this.activationCode.markUsed(now);
+        this.dataConsent = new ConsentAcceptance(command.consentVersion(), now);
+    }
+
+    // The invitation of a new trainer redeemed by someone who already has an account: the code is
+    // used up and this pending account is discarded, because the existing account is the one that
+    // moves to the new trainer (see rejoin). It never gets an email or a password.
+    public void consumeInvitation(ActivateAccountCommand command, Instant now) {
+        assertRedeemable(command, now);
+        this.activationCode.markUsed(now);
+        this.status = AccountStatus.DISABLED;
+    }
+
+    // An existing client account joining another trainer, or coming back after being deactivated:
+    // it keeps its email, password and id (so its history follows it) and is active again, with
+    // the consent accepted in this redemption.
+    public void rejoin(ActivateAccountCommand command, Instant now) {
+        if (!hasRole(Role.CLIENT)) {
+            throw new IllegalStateException("Only client accounts can join a trainer");
+        }
+        this.status = AccountStatus.ACTIVE;
+        this.failedSignIns = new FailedSignInAttempts(0, null);
+        this.dataConsent = new ConsentAcceptance(command.consentVersion(), now);
+    }
+
+    private void assertRedeemable(ActivateAccountCommand command, Instant now) {
         if (status != AccountStatus.PENDING_ACTIVATION
                 || activationCode == null
                 || !activationCode.getCode().equals(command.activationCode())
@@ -99,11 +129,6 @@ public class User {
             throw new ConsentRequiredException();
         }
         assertPasswordPolicy(command.rawPassword());
-        this.email = command.email();
-        this.hashedPassword = hashedPassword;
-        this.status = AccountStatus.ACTIVE;
-        this.activationCode.markUsed(now);
-        this.dataConsent = new ConsentAcceptance(command.consentVersion(), now);
     }
 
     public boolean canSignInFrom(ClientApplication application) {
@@ -129,6 +154,12 @@ public class User {
 
     public boolean isLocked(Instant now) {
         return failedSignIns.lockedUntil() != null && now.isBefore(failedSignIns.lockedUntil());
+    }
+
+    // A deactivated client can still reset the password: it is how they prove the account is
+    // theirs when they join another trainer. Resetting it does not let them sign in again.
+    public boolean canRequestPasswordReset() {
+        return status == AccountStatus.ACTIVE || (status == AccountStatus.DISABLED && hasRole(Role.CLIENT));
     }
 
     public PasswordResetToken requestPasswordReset(Instant now) {

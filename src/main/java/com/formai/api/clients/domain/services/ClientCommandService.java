@@ -5,6 +5,7 @@ import com.formai.api.clients.domain.model.commands.ActivateClientCommand;
 import com.formai.api.clients.domain.model.commands.DeactivateClientCommand;
 import com.formai.api.clients.domain.model.commands.RegisterClientCommand;
 import com.formai.api.clients.domain.model.commands.RenewActivationCodeCommand;
+import com.formai.api.clients.domain.model.commands.TransferClientCommand;
 import com.formai.api.clients.domain.model.commands.UpdateBodyProfileCommand;
 import com.formai.api.clients.domain.model.commands.UpdateClientCommand;
 import com.formai.api.clients.domain.model.valueobjects.ActivationTicket;
@@ -21,6 +22,8 @@ public interface ClientCommandService {
     Optional<ActivationTicket> handle(RenewActivationCodeCommand command);
 
     void handle(ActivateClientCommand command);
+
+    void handle(TransferClientCommand command);
 
     Optional<Client> handle(DeactivateClientCommand command);
 

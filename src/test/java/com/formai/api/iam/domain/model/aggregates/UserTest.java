@@ -297,4 +297,51 @@ class UserTest {
 
         assertThat(user.getStatus()).isEqualTo(AccountStatus.DISABLED);
     }
+
+    @Test
+    void shouldUseUpTheInvitationWithoutTakingAnEmailWhenItsOwnerAlreadyHasAnAccount() {
+        var invited = pendingClient();
+
+        invited.consumeInvitation(activation(invited, "secret123", true), NOW);
+
+        assertThat(invited.getStatus()).isEqualTo(AccountStatus.DISABLED);
+        assertThat(invited.getEmail()).isNull();
+        assertThat(invited.getActivationCode().isUsable(NOW)).isFalse();
+    }
+
+    @Test
+    void shouldComeBackActiveKeepingEmailAndPasswordWhenRejoining() {
+        var client = pendingClient();
+        client.activate(activation(client, "secret123", true), HASHED, NOW);
+        client.disable();
+
+        client.rejoin(activation(client, "secret123", true), NOW.plusSeconds(60));
+
+        assertThat(client.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(client.getEmail()).isEqualTo(CLIENT_EMAIL);
+        assertThat(client.getHashedPassword()).isEqualTo(HASHED);
+        assertThat(client.getDataConsent().acceptedAt()).isEqualTo(NOW.plusSeconds(60));
+    }
+
+    @Test
+    void shouldNotLetATrainerAccountJoinATrainer() {
+        var trainer = trainer();
+
+        assertThatThrownBy(() -> trainer.rejoin(activation(pendingClient(), "secret123", true), NOW))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void shouldAllowPasswordResetToActiveAccountsAndDeactivatedClientsOnly() {
+        var deactivatedClient = pendingClient();
+        deactivatedClient.activate(activation(deactivatedClient, "secret123", true), HASHED, NOW);
+        deactivatedClient.disable();
+        var disabledTrainer = trainer();
+        disabledTrainer.disable();
+
+        assertThat(trainer().canRequestPasswordReset()).isTrue();
+        assertThat(deactivatedClient.canRequestPasswordReset()).isTrue();
+        assertThat(pendingClient().canRequestPasswordReset()).isFalse();
+        assertThat(disabledTrainer.canRequestPasswordReset()).isFalse();
+    }
 }

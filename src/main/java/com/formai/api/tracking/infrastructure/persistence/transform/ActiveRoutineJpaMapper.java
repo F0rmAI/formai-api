@@ -12,8 +12,12 @@ import com.formai.api.tracking.infrastructure.persistence.entities.ActiveRoutine
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.time.DayOfWeek;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
 public interface ActiveRoutineJpaMapper {
@@ -50,6 +54,16 @@ public interface ActiveRoutineJpaMapper {
 
     default RoutineId mapRoutineId(UUID value) {
         return value == null ? null : new RoutineId(value);
+    }
+
+    default String mapTrainingDays(Set<DayOfWeek> trainingDays) {
+        return trainingDays == null ? null
+                : trainingDays.stream().sorted().map(DayOfWeek::name).collect(Collectors.joining(","));
+    }
+
+    default Set<DayOfWeek> mapTrainingDays(String trainingDays) {
+        return trainingDays == null ? null
+                : Arrays.stream(trainingDays.split(",")).map(DayOfWeek::valueOf).collect(Collectors.toSet());
     }
 
     default String mapDays(List<RoutineDay> days) {

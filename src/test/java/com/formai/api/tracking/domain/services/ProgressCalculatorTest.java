@@ -11,6 +11,7 @@ import com.formai.api.tracking.domain.model.valueobjects.Reps;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 import static com.formai.api.tracking.TrackingTestData.BENCH_PRESS;
@@ -37,12 +38,16 @@ class ProgressCalculatorTest {
         partial.finish(new FinishWorkoutSessionCommand(partial.getId(), CLIENT_ID, true));
 
         var completed = pendingSession(TODAY.minusDays(7));
-        record(completed, SQUAT, 1, "70", 8);
-        record(completed, BENCH_PRESS, 1, "40", 8);
+        for (int set = 1; set <= SQUAT.sets(); set++) {
+            record(completed, SQUAT, set, "70", 8);
+        }
+        for (int set = 1; set <= BENCH_PRESS.sets(); set++) {
+            record(completed, BENCH_PRESS, set, "40", 8);
+        }
         completed.finish(new FinishWorkoutSessionCommand(completed.getId(), CLIENT_ID, false));
 
         var skipped = pendingSession(TODAY.minusDays(3));
-        skipped.skip();
+        skipped.closeOverdue(Instant.now());
         return List.of(skipped, completed, partial);
     }
 
@@ -69,7 +74,7 @@ class ProgressCalculatorTest {
         assertThat(squat.firstMaxLoad().kilograms()).isEqualByComparingTo("65");
         assertThat(squat.lastMaxLoad().kilograms()).isEqualByComparingTo("70");
         assertThat(squat.firstVolume().kilograms()).isEqualByComparingTo("1120");
-        assertThat(squat.lastVolume().kilograms()).isEqualByComparingTo("560");
+        assertThat(squat.lastVolume().kilograms()).isEqualByComparingTo("1680");
     }
 
     @Test
@@ -88,7 +93,7 @@ class ProgressCalculatorTest {
         assertThat(progress.points()).extracting(point -> point.date())
                 .containsExactly(TODAY.minusDays(14), TODAY.minusDays(7));
         assertThat(progress.points().getFirst().maxLoad().kilograms()).isEqualByComparingTo("65");
-        assertThat(progress.points().getLast().volume().kilograms()).isEqualByComparingTo("560");
+        assertThat(progress.points().getLast().volume().kilograms()).isEqualByComparingTo("1680");
         assertThat(progress.enoughData()).isTrue();
     }
 

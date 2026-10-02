@@ -8,6 +8,7 @@ public record ActiveRoutineResource(UUID routineId,
                                     String routineName,
                                     int version,
                                     LocalDate startDate,
+                                    List<String> trainingDays,
                                     Integer todaySessionOrder,
                                     UUID todayWorkoutSessionId,
                                     List<RoutineDayResource> sessions) { }
