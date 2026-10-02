@@ -12,6 +12,7 @@ import com.formai.api.shared.contracts.planning.PrescribedExerciseSnapshot;
 import com.formai.api.shared.contracts.planning.SessionSnapshot;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +40,7 @@ public class PlanningContextFacadeImpl implements PlanningContextFacade {
                 routine.getName().value(),
                 version.getNumber(),
                 assignment.startDate(),
+                new LinkedHashSet<>(assignment.trainingDays().names()),
                 version.getSessions().stream().map(this::toSnapshot).toList());
     }
 

@@ -42,7 +42,8 @@ public class ClientPlan {
         // Whoever assigns is the client's trainer (checked before): the plan follows that trainer,
         // which also repairs a plan left with the previous one after a failed transfer.
         this.holderId = command.holderId();
-        var assignment = new Assignment(command.routineId(), AssignmentPeriod.startingOn(command.startDate()));
+        var assignment = new Assignment(command.routineId(), AssignmentPeriod.startingOn(command.startDate()),
+                command.trainingDays());
         this.assignments = new ArrayList<>(assignments);
         this.assignments.add(assignment);
         return assignment;
