@@ -85,10 +85,29 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldEndTheClientsRoutineWhenTheAssignmentIsClosed() {
-        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService);
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
 
         handler.on(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY));
 
         verify(activeRoutineCommandService).handle(new EndActiveRoutineCommand(CLIENT_ID, TODAY));
+    }
+
+    @Test
+    void shouldLetTodaysSessionFollowTheRoutineWhenAnAssignmentCloses() {
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+
+        handler.rescheduleOn(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY.minusDays(1)), TODAY);
+
+        verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
+    }
+
+    @Test
+    void shouldNotFailWhenNoRoutineReplacesTheOneThatEnded() {
+        doThrow(new ActiveRoutineNotFoundException())
+                .when(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+
+        assertThatCode(() -> handler.rescheduleOn(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(),
+                TODAY.minusDays(1)), TODAY)).doesNotThrowAnyException();
     }
 }

@@ -120,6 +120,7 @@ class WorkoutSessionCommandServiceImplTest {
     @Test
     void shouldReturnTheSessionAlreadyScheduledForThatDate() {
         var existing = pendingSession(TODAY);
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(activeRoutine()));
         when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(existing));
 
         var session = commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
@@ -234,5 +235,46 @@ class WorkoutSessionCommandServiceImplTest {
 
         assertThat(commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY))).isEmpty();
         verify(workoutSessionRepository, never()).save(any(WorkoutSession.class));
+    }
+
+    @Test
+    void shouldReplaceAnUntouchedSessionOfARoutineThatNoLongerApplies() {
+        // Arrange: today's session was scheduled from the previous routine and never used
+        var stale = pendingSession(TODAY);
+        stale.setRoutineId(new RoutineId(UUID.randomUUID()));
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(activeRoutine()));
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(stale));
+        when(workoutSessionRepository.findLastFinishedByClientId(CLIENT_ID)).thenReturn(Optional.empty());
+        savesReturnTheSession();
+
+        // Act
+        var session = commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY)).orElseThrow();
+
+        // Assert
+        verify(workoutSessionRepository).delete(stale.getId());
+        assertThat(session.getRoutineId()).isEqualTo(activeRoutine().getRoutineId());
+    }
+
+    @Test
+    void shouldKeepASessionWithRecordsEvenIfItsRoutineNoLongerApplies() {
+        var started = pendingSession(TODAY);
+        started.recordSet(recordSquat(started));
+        started.setRoutineId(new RoutineId(UUID.randomUUID()));
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(activeRoutine()));
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(started));
+
+        assertThat(commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY))).containsSame(started);
+        verify(workoutSessionRepository, never()).delete(any(WorkoutSessionId.class));
+    }
+
+    @Test
+    void shouldDropAnUntouchedSessionWhenNoRoutineAppliesAnymore() {
+        var stale = pendingSession(TODAY);
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.empty());
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(stale));
+
+        assertThatThrownBy(() -> commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY)))
+                .isInstanceOf(ActiveRoutineNotFoundException.class);
+        verify(workoutSessionRepository).delete(stale.getId());
     }
 }
