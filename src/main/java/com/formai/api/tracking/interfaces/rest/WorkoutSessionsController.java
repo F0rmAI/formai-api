@@ -145,7 +145,8 @@ public class WorkoutSessionsController {
 
     @Operation(summary = "Finish a session",
             description = "Closes the session and returns its compliance status: COMPLETED when every " +
-                    "exercise has sets recorded, PARTIAL when some do not and confirmPartial is true.")
+                    "prescribed set of every exercise is recorded, PARTIAL when some are missing and " +
+                    "confirmPartial is true.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Session finished — returns it with its status",
                     content = @Content(schema = @Schema(implementation = WorkoutSessionResource.class))),

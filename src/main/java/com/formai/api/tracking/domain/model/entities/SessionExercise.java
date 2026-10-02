@@ -51,6 +51,11 @@ public class SessionExercise {
         return !sets.isEmpty();
     }
 
+    // Every prescribed set has been recorded (a set number is recorded at most once).
+    public boolean isComplete() {
+        return sets.size() >= toPerform.sets();
+    }
+
     public TrainingVolume volume() {
         return sets.stream()
                 .map(SetEntry::volume)

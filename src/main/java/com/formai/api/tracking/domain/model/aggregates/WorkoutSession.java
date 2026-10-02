@@ -80,8 +80,9 @@ public class WorkoutSession {
         status = ComplianceStatus.SKIPPED;
     }
 
+    // COMPLETED asks for every prescribed set of every exercise; anything less is PARTIAL.
     public boolean isComplete() {
-        return exercises.stream().allMatch(SessionExercise::isRegistered);
+        return exercises.stream().allMatch(SessionExercise::isComplete);
     }
 
     public boolean hasRecords() {
