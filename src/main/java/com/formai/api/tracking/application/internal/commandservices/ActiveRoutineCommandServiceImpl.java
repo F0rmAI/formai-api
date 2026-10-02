@@ -4,6 +4,7 @@ import com.formai.api.tracking.application.internal.outboundservices.acl.Externa
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,13 @@ public class ActiveRoutineCommandServiceImpl implements ActiveRoutineCommandServ
                             .orElseGet(() -> ActiveRoutine.syncFrom(command, plan));
                     return activeRoutineRepository.save(routine);
                 });
+    }
+
+    // Every client following the routine gets its latest version.
+    @Override
+    public void handle(SyncActiveRoutinesOfRoutineCommand command) {
+        activeRoutineRepository.findAllByRoutineId(command.routineId())
+                .forEach(routine -> handle(new SyncActiveRoutineCommand(routine.getClientId())));
     }
 
     @Override

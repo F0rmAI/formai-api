@@ -11,6 +11,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // Explicit bean name: tracking has an event handler with the same simple name.
+// Resilience: self-healing. If this fails the Routine stays ACTIVE with no clients, which only
+// changes the status the trainer sees (tracking follows the assignments, not this status); the
+// next assignment or closing of that routine evaluates it again.
 @Component("planningAssignmentClosedEventHandler")
 public class AssignmentClosedEventHandler {
 

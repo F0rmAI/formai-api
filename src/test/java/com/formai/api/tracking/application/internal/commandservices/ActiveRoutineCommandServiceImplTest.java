@@ -4,6 +4,8 @@ import com.formai.api.tracking.application.internal.outboundservices.acl.Externa
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
+import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,9 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.formai.api.tracking.TrackingTestData.CLIENT_ID;
+import static com.formai.api.tracking.TrackingTestData.ROUTINE_ID;
 import static com.formai.api.tracking.TrackingTestData.TODAY;
 import static com.formai.api.tracking.TrackingTestData.activeRoutine;
 import static com.formai.api.tracking.TrackingTestData.plannedRoutine;
@@ -54,6 +59,27 @@ class ActiveRoutineCommandServiceImplTest {
             assertThat(synced.getClientId()).isEqualTo(CLIENT_ID);
             assertThat(synced.getVersion()).isEqualTo(1);
         });
+    }
+
+    @Test
+    void shouldSyncEveryClientFollowingTheRoutine() {
+        // Arrange
+        var otherClient = new ClientId(UUID.randomUUID());
+        var first = activeRoutine();
+        var second = activeRoutine();
+        second.setClientId(otherClient);
+        when(activeRoutineRepository.findAllByRoutineId(ROUTINE_ID)).thenReturn(List.of(first, second));
+        when(externalPlanningService.fetchActiveRoutine(any(ClientId.class))).thenReturn(Optional.of(plannedRoutine(2)));
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(first));
+        when(activeRoutineRepository.findByClientId(otherClient)).thenReturn(Optional.of(second));
+        savesReturnTheRoutine();
+
+        // Act
+        commandService.handle(new SyncActiveRoutinesOfRoutineCommand(ROUTINE_ID));
+
+        // Assert
+        assertThat(first.getVersion()).isEqualTo(2);
+        assertThat(second.getVersion()).isEqualTo(2);
     }
 
     @Test

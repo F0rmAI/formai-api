@@ -12,6 +12,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDate;
 
+// Resilience: none, accepted. If this fails the assignment stays open. It has no effect on the
+// client, whose account is already disabled in iam and cannot sign in, but nothing closes it
+// later, so tracking keeps scheduling that client's sessions until the trainer reassigns.
 @Component
 public class ClientDeactivatedEventHandler {
 

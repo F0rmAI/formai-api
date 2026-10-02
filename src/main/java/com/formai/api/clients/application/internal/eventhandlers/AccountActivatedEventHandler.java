@@ -11,6 +11,9 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // fallbackExecution: iam publishes its events outside a transaction; without it Spring drops them.
+// Resilience: self-healing. If this fails the Client stays INVITED with an account that is already
+// active: ClientQueryService notices it when reading (iam's account status) and the trainer's next
+// write on that client runs ActivateClient first.
 @Component
 public class AccountActivatedEventHandler {
 
