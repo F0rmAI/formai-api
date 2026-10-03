@@ -2,9 +2,9 @@
 
 Inter-session project memory. This file contains about 50 lines: summarize or remove content that no longer adds value.
 
-## Current status (2026-10-02)
-- The TP (MVP, Sprints 1–2) backend is complete on branch `feature/mvp-closure` (not merged yet): US-001…US-017
-  and US-033…US-036 are delivered. Suite: 459 tests. Spec is at version 0.4.0.
+## Current status (2026-10-03)
+- The TP (MVP, Sprints 1–2) backend is released (0.1.2, deployed on Railway from `main`): US-001…US-017 and
+  US-033…US-036 are delivered. Suite: 461 tests. Spec is at version 0.4.0.
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
 - Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
@@ -23,7 +23,8 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
   so every past session has a final status.
 - Swagger tags by purpose in `shared/interfaces/rest/ApiTags`; `AGENTS.md` is the single instruction file.
 - Sessions: 30-min JWT + 7-day rotating refresh cookie; bcrypt cost 12; consent stored with its text version.
-- Email through Brevo over SMTP, retried up to 5 times; the body is redacted once the delivery is closed.
+- Email through Brevo's HTTP API (`BREVO_API_KEY`, `xkeysib-…`), not SMTP: Railway blocks outbound SMTP below
+  the Pro plan (the send timed out and never reached Brevo). Retried up to 5 times; body redacted once closed.
 
 ## Lessons learned and mistakes to avoid
 - Controller tests: use `.with(user(<real id>).roles(...))`, not `@WithMockUser` (holderId = `getName()`).
@@ -45,9 +46,9 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
 ## Next steps (to operate the MVP)
 - Front ends: the web must send `trainingDays` when assigning and stop asking for the client's email; it
   needs a `/password-reset` page. The app must send email and `consentVersion` on activation.
-- Set the `SMTP_*` variables in the demo environment and in every teammate's `.env`.
+- Set `BREVO_API_KEY`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` in every `.env` (SMTP_HOST/PORT/USER/PASSWORD are gone).
 - Deployment: Dockerfile + `backend` service in compose, Caddy with TLS and a subdomain, on the Linux VM.
 - Daily Postgres backup with 7-day retention and one tested restore; external monitor on `/actuator/health`.
 - Quality evidence: k6 (P95 < 300 ms), OWASP ZAP baseline, JaCoCo ≥ 70 % on domain/application.
 - Audit backlog: clients↔iam share one transaction; iam and tracking command services lack `@Transactional`;
-  ArchUnit layered rule; tests with a real JWT and a context-load test; SMTP send inside the DB transaction.
+  ArchUnit layered rule; tests with a real JWT and a context-load test; Brevo call inside the DB transaction.
