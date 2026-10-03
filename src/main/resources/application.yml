@@ -15,20 +15,11 @@ spring:
         default_schema: public
     open-in-view: false
 
-  # Transactional email through Brevo's SMTP relay (US-005). Without SMTP_USER/SMTP_PASSWORD the
-  # application still starts; SmtpEmailDeliveryService just reports the delivery as failed.
-  mail:
-    host: ${SMTP_HOST:smtp-relay.brevo.com}
-    port: ${SMTP_PORT:587}
-    username: ${SMTP_USER:}
-    password: ${SMTP_PASSWORD:}
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
-      mail.smtp.starttls.required: true   # never send credentials or the reset link in clear text
-      mail.smtp.connectiontimeout: 5000
-      mail.smtp.timeout: 5000
-      mail.smtp.writetimeout: 5000
+  # Bound the Brevo HTTP API call.
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 5s
 
   flyway:
     enabled: false   # each module runs its own Flyway instance with its own history table (see shared/config/FlywayConfig)
@@ -54,6 +45,9 @@ tracking:
 notifications:
   password-reset-url: ${PASSWORD_RESET_URL:http://localhost:5173/password-reset?token=}   # the token is appended
   email:
+    api-key: ${BREVO_API_KEY:}   # Brevo > SMTP & API > API Keys; starts with xkeysib-
+    brevo:
+      base-url: https://api.brevo.com/v3
     from-address: ${SMTP_FROM_EMAIL:}   # sender verified in Brevo
     from-name: ${SMTP_FROM_NAME:FormAI}
   jobs:
@@ -73,6 +67,3 @@ management:
   endpoint:
     health:
       show-details: never   # UP/DOWN only; no infra details to an unauthenticated caller
-  health:
-    mail:
-      enabled: false   # the healthcheck must not depend on (or open a connection to) the SMTP relay
