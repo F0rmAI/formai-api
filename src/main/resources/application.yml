@@ -34,7 +34,7 @@ spring:
     enabled: false   # each module runs its own Flyway instance with its own history table (see shared/config/FlywayConfig)
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
 
 formai:
   jwt:
