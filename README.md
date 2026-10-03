@@ -20,7 +20,7 @@ through Open Host Services and domain events rather than over the network.
 - Exercise catalog, versioned routines and routine assignments
 - Workout logging with compliance status, history, progress reports and progress charts
 - Today's session scheduled on assignment, by a daily job and on startup; overdue ones skipped
-- Outbox of notifications (password reset email) delivered by a scheduled dispatcher through Brevo's SMTP relay
+- Outbox of notifications (password reset email) delivered by a scheduled dispatcher through Brevo's transactional HTTP API
 - Spring Boot Framework
 - Spring Data JPA
 - Bean Validation
@@ -200,11 +200,12 @@ password reset email (the only transactional email of the product):
 - Resilience is outbox + reconciliation: the `Notification` row is the outbox. If the handler
   fails after IAM's commit no email goes out; the reset request still answers the same neutral
   message and the user can ask for a new link.
-- `SmtpEmailDeliveryService` sends through Brevo's SMTP relay over STARTTLS (`SMTP_HOST`,
-  `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`) from the sender verified in Brevo (`SMTP_FROM_EMAIL`,
-  `SMTP_FROM_NAME`). It never logs the address, the body (it carries the token) or the relay's
-  error message. Without those variables the application still starts and the email stays
-  `FAILED`.
+- `BrevoApiEmailDeliveryService` sends through Brevo's transactional HTTP API
+  (`POST /v3/smtp/email`) using `BREVO_API_KEY` and the sender verified in Brevo
+  (`SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`). Railway blocks outbound SMTP on Hobby,
+  so the request uses HTTPS. It never logs the destination, the body (which carries
+  the token) or the provider response (which can echo the address). Without the key
+  or sender address the application still starts and deliveries stay `FAILED`.
 
 It has no REST endpoints and depends on no other context's facade.
 
@@ -262,7 +263,7 @@ cp .env.example .env   # set DB_PASSWORD and JWT_SECRET (openssl rand -base64 64
 `PASSWORD_RESET_URL` (the front-end page that receives the reset token),
 `NOTIFICATIONS_DISPATCHER_DELAY`, `JWT_EXPIRATION_MINUTES` (30) and `JWT_REFRESH_EXPIRATION_DAYS` (7)
 are optional; `.env.example` shows their defaults. To send the password reset email, set the
-Brevo SMTP variables (`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
+Brevo HTTP API key (`BREVO_API_KEY`) and verified sender (`SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`).
 
 `JWT_COOKIE_SECURE` (default `true`) controls the `Secure` flag of the session cookies. Set it to
 `false` only for local development over plain HTTP with the mobile app: iOS and Android never send
