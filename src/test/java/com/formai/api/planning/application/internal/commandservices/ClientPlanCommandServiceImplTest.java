@@ -4,6 +4,7 @@ import com.formai.api.planning.application.internal.outboundservices.acl.Externa
 import com.formai.api.planning.domain.exceptions.AssigneeNotFoundException;
 import com.formai.api.planning.domain.exceptions.ClientNotAssignableException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
+import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,8 +60,11 @@ class ClientPlanCommandServiceImplTest {
     private final RoutineId routineId = routine().getId();
 
     private AssignRoutineCommand assignFrom(LocalDate startDate) {
-        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate, TrainingDays.everyDay());
+        return new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, startDate, TWO_DAYS);
     }
+
+    // routine() has two sessions, so it is assigned on two days of the week.
+    private static final TrainingDays TWO_DAYS = TrainingDays.ofNames(List.of("MONDAY", "THURSDAY"));
 
     private void routineAndActiveClientExist() {
         when(routineRepository.findByIdAndHolderId(routineId, TRAINER_HOLDER_ID)).thenReturn(Optional.of(routine()));
@@ -98,6 +103,18 @@ class ClientPlanCommandServiceImplTest {
                 START_DATE.plusDays(27)));
         verify(eventPublisher).publishEvent(new RoutineAssigned(CLIENT_ID.value(), routineId.value(),
                 START_DATE.plusDays(28)));
+    }
+
+    @Test
+    void shouldRejectMoreTrainingDaysThanSessions() {
+        when(routineRepository.findByIdAndHolderId(routineId, TRAINER_HOLDER_ID)).thenReturn(Optional.of(routine()));
+        var threeDays = TrainingDays.ofNames(List.of("MONDAY", "WEDNESDAY", "FRIDAY"));
+
+        assertThatThrownBy(() -> commandService.handle(
+                new AssignRoutineCommand(routineId, CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, threeDays)))
+                .isInstanceOf(TrainingDaysMismatchException.class);
+        verify(clientPlanRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
