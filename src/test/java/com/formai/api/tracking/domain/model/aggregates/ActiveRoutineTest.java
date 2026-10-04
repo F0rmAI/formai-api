@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -92,5 +93,30 @@ class ActiveRoutineTest {
         assertThat(routine.trainsOn(monday.plusDays(1))).isFalse();
         assertThat(routine.trainsOn(monday.plusDays(2))).isTrue();
         assertThat(routine.trainsOn(LocalDate.of(2026, 8, 31))).isFalse();   // a Monday before the start date
+    }
+
+    @Test
+    void shouldStartTheClientsDayAtMidnightInTheirOwnTimeZone() {
+        var routine = activeRoutine();
+        // 00:30 in Buenos Aires is still 22:30 of the day before in Lima.
+        var instant = LocalDate.of(2026, 10, 5).atTime(0, 30)
+                .atZone(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant();
+
+        assertThat(routine.getTimeZone()).isEqualTo(ActiveRoutine.DEFAULT_TIME_ZONE);
+        assertThat(routine.today(instant)).isEqualTo(LocalDate.of(2026, 10, 4));
+        assertThat(routine.changeTimeZone(ZoneId.of("America/Argentina/Buenos_Aires"))).isTrue();
+        assertThat(routine.today(instant)).isEqualTo(LocalDate.of(2026, 10, 5));
+        assertThat(routine.changeTimeZone(ZoneId.of("America/Argentina/Buenos_Aires"))).isFalse();
+    }
+
+    @Test
+    void shouldBeDueForTheDailyRunOncePerDay() {
+        var routine = activeRoutine();
+        var day = LocalDate.of(2026, 10, 5);
+
+        assertThat(routine.isDueForDailyRun(day)).isTrue();
+        routine.recordDailyRun(day);
+        assertThat(routine.isDueForDailyRun(day)).isFalse();
+        assertThat(routine.isDueForDailyRun(day.plusDays(1))).isTrue();
     }
 }

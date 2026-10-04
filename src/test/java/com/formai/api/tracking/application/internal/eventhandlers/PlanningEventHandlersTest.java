@@ -9,7 +9,9 @@ import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionComma
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
+import com.formai.api.tracking.domain.model.queries.GetClientTodayQuery;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
+import com.formai.api.tracking.domain.services.ActiveRoutineQueryService;
 import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PlanningEventHandlersTest {
@@ -35,11 +38,26 @@ class PlanningEventHandlersTest {
     ActiveRoutineCommandService activeRoutineCommandService;
 
     @Mock
+    ActiveRoutineQueryService activeRoutineQueryService;
+
+    @Mock
     WorkoutSessionCommandService workoutSessionCommandService;
 
     @Test
+    void shouldScheduleOnTheClientsOwnDateRightAfterTheAssignment() {
+        when(activeRoutineQueryService.handle(any(GetClientTodayQuery.class))).thenReturn(TODAY);
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
+
+        handler.scheduleToday(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY));
+
+        verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
+    }
+
+    @Test
     void shouldSyncTheClientsRoutineWhenARoutineIsAssigned() {
-        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         handler.on(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), START_DATE));
 
@@ -48,7 +66,8 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldScheduleTodaysSessionWhenTheAssignedRoutineStartsToday() {
-        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         handler.scheduleOn(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY), TODAY);
 
@@ -57,7 +76,8 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldNotScheduleASessionWhenTheAssignedRoutineStartsLater() {
-        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         handler.scheduleOn(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY.plusDays(3)), TODAY);
 
@@ -68,7 +88,8 @@ class PlanningEventHandlersTest {
     void shouldNotFailTheAssignmentWhenTodaysSessionCannotBeScheduled() {
         doThrow(new ActiveRoutineNotFoundException())
                 .when(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
-        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new RoutineAssignedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         assertThatCode(() -> handler.scheduleOn(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), START_DATE),
                 TODAY)).doesNotThrowAnyException();
@@ -85,7 +106,8 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldEndTheClientsRoutineWhenTheAssignmentIsClosed() {
-        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         handler.on(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY));
 
@@ -94,7 +116,8 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldLetTodaysSessionFollowTheRoutineWhenAnAssignmentCloses() {
-        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         handler.rescheduleOn(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY.minusDays(1)), TODAY);
 
@@ -105,7 +128,8 @@ class PlanningEventHandlersTest {
     void shouldNotFailWhenNoRoutineReplacesTheOneThatEnded() {
         doThrow(new ActiveRoutineNotFoundException())
                 .when(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
-        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, workoutSessionCommandService);
+        var handler = new AssignmentClosedEventHandler(activeRoutineCommandService, activeRoutineQueryService,
+                workoutSessionCommandService);
 
         assertThatCode(() -> handler.rescheduleOn(new AssignmentClosed(CLIENT_ID.value(), ROUTINE_ID.value(),
                 TODAY.minusDays(1)), TODAY)).doesNotThrowAnyException();
