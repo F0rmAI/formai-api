@@ -8,6 +8,7 @@ import com.formai.api.tracking.domain.model.commands.FinishWorkoutSessionCommand
 import com.formai.api.tracking.domain.model.commands.RecordSetCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
+import com.formai.api.tracking.domain.model.commands.CloseClientOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.events.SetRecorded;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionFinished;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionScheduled;
@@ -22,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -103,8 +105,17 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
 
     @Override
     public void handle(CloseOverdueWorkoutSessionsCommand command) {
+        close(workoutSessionRepository.findAllPendingBefore(command.date()));
+    }
+
+    @Override
+    public void handle(CloseClientOverdueWorkoutSessionsCommand command) {
+        close(workoutSessionRepository.findAllPendingByClientIdBefore(command.clientId(), command.date()));
+    }
+
+    private void close(List<WorkoutSession> overdue) {
         var now = Instant.now();
-        workoutSessionRepository.findAllPendingBefore(command.date()).forEach(session -> {
+        overdue.forEach(session -> {
             var status = session.closeOverdue(now);
             var saved = workoutSessionRepository.save(session);
             if (status == ComplianceStatus.SKIPPED) {

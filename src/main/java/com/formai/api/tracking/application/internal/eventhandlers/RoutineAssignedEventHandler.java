@@ -3,8 +3,10 @@ package com.formai.api.tracking.application.internal.eventhandlers;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.queries.GetClientTodayQuery;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
+import com.formai.api.tracking.domain.services.ActiveRoutineQueryService;
 import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 // Explicit bean name: planning has an event handler with the same simple name.
@@ -31,11 +34,14 @@ public class RoutineAssignedEventHandler {
     private static final Logger log = LoggerFactory.getLogger(RoutineAssignedEventHandler.class);
 
     private final ActiveRoutineCommandService activeRoutineCommandService;
+    private final ActiveRoutineQueryService activeRoutineQueryService;
     private final WorkoutSessionCommandService workoutSessionCommandService;
 
     public RoutineAssignedEventHandler(ActiveRoutineCommandService activeRoutineCommandService,
+                                       ActiveRoutineQueryService activeRoutineQueryService,
                                        WorkoutSessionCommandService workoutSessionCommandService) {
         this.activeRoutineCommandService = activeRoutineCommandService;
+        this.activeRoutineQueryService = activeRoutineQueryService;
         this.workoutSessionCommandService = workoutSessionCommandService;
     }
 
@@ -50,7 +56,8 @@ public class RoutineAssignedEventHandler {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void scheduleToday(RoutineAssigned event) {
-        scheduleOn(event, LocalDate.now());
+        var clientId = new ClientId(event.clientId());
+        scheduleOn(event, activeRoutineQueryService.handle(new GetClientTodayQuery(clientId, Instant.now())));
     }
 
     // Idempotent: scheduling returns the session already scheduled for that date, if any.

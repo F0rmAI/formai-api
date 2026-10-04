@@ -1,6 +1,7 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
+import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
 import com.formai.api.planning.domain.model.commands.CreateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.DuplicateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
@@ -10,6 +11,7 @@ import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
 import com.formai.api.planning.domain.model.valueobjects.RoutineName;
 import com.formai.api.planning.domain.model.valueobjects.RoutineStatus;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,6 +62,15 @@ public class Routine {
 
     public RoutineVersion currentVersion() {
         return versions.stream().max(Comparator.comparingInt(RoutineVersion::getNumber)).orElseThrow();
+    }
+
+    // One training day per session: each week the client goes through the whole routine once,
+    // so a routine of two sessions is assigned on exactly two days of the week.
+    public void ensureFits(TrainingDays trainingDays) {
+        var sessions = currentVersion().getSessions().size();
+        if (trainingDays.days().size() != sessions) {
+            throw new TrainingDaysMismatchException(sessions, trainingDays.days().size());
+        }
     }
 
     public boolean usesExercise(ExerciseId exerciseId) {

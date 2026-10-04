@@ -66,12 +66,12 @@ class ActiveRoutineRepositoryImplTest {
     }
 
     @Test
-    void shouldFindTheRoutinesActiveOnADate() {
+    void shouldFindTheRoutinesActiveBetweenTwoDates() {
         var entity = new ActiveRoutineJpaEntity();
         var routine = new ActiveRoutine();
-        when(jpaRepository.findAllActiveOn(TODAY)).thenReturn(List.of(entity));
+        when(jpaRepository.findAllActiveBetween(TODAY.minusDays(1), TODAY)).thenReturn(List.of(entity));
         when(mapper.toDomain(entity)).thenReturn(routine);
 
-        assertThat(repository.findAllActiveOn(TODAY)).containsExactly(routine);
+        assertThat(repository.findAllActiveBetween(TODAY.minusDays(1), TODAY)).containsExactly(routine);
     }
 }

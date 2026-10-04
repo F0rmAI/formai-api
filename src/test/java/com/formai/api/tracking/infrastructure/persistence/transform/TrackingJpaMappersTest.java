@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
 
 import static com.formai.api.tracking.TrackingTestData.BACK_DAY;
 import static com.formai.api.tracking.TrackingTestData.BENCH_PRESS;
@@ -31,6 +32,8 @@ class TrackingJpaMappersTest {
         // Arrange
         var routine = activeRoutine();
         routine.end(new EndActiveRoutineCommand(CLIENT_ID, TODAY));
+        routine.changeTimeZone(ZoneId.of("Asia/Kolkata"));
+        routine.recordDailyRun(TODAY);
 
         // Act
         var entity = activeRoutineMapper.toEntity(routine);
@@ -43,6 +46,9 @@ class TrackingJpaMappersTest {
         assertThat(restored.getRoutineId()).isEqualTo(routine.getRoutineId());
         assertThat(restored.getEndDate()).isEqualTo(TODAY);
         assertThat(restored.getDays()).containsExactly(LEGS_DAY, BACK_DAY);
+        assertThat(entity.getTimeZone()).isEqualTo("Asia/Kolkata");
+        assertThat(restored.getTimeZone()).isEqualTo(routine.getTimeZone());
+        assertThat(restored.getLastDailyRunOn()).isEqualTo(TODAY);
     }
 
     @Test
