@@ -42,8 +42,9 @@ public class ClientPlanCommandServiceImpl implements ClientPlanCommandService {
     @Override
     @Transactional
     public Optional<ClientPlan> handle(AssignRoutineCommand command) {
-        routineRepository.findByIdAndHolderId(command.routineId(), command.holderId())
+        var routine = routineRepository.findByIdAndHolderId(command.routineId(), command.holderId())
                 .orElseThrow(RoutineNotFoundException::new);
+        routine.ensureFits(command.trainingDays());
         var isActive = externalClientsService.isActiveClientOfTrainer(command.clientId(), command.holderId())
                 .orElseThrow(AssigneeNotFoundException::new);
         if (!isActive) {

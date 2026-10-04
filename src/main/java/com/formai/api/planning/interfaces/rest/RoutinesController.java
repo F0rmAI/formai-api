@@ -189,7 +189,8 @@ public class RoutinesController {
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
             @ApiResponse(responseCode = "404", description = "No such routine, or a client that is not yours",
                     content = @Content),
-            @ApiResponse(responseCode = "422", description = "A client is not active", content = @Content)
+            @ApiResponse(responseCode = "422", description = "A client is not active, or the number of training " +
+                    "days differs from the number of sessions of the routine", content = @Content)
     })
     @PostMapping("/{id}/assignments")
     public ResponseEntity<List<AssignmentResource>> assign(@PathVariable UUID id,
