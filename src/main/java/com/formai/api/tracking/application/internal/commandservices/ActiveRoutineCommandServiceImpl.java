@@ -2,7 +2,9 @@ package com.formai.api.tracking.application.internal.commandservices;
 
 import com.formai.api.tracking.application.internal.outboundservices.acl.ExternalPlanningService;
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
+import com.formai.api.tracking.domain.model.commands.ChangeTimeZoneCommand;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.RecordDailyRunCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.repositories.ActiveRoutineRepository;
@@ -49,6 +51,22 @@ public class ActiveRoutineCommandServiceImpl implements ActiveRoutineCommandServ
         activeRoutineRepository.findByClientId(command.clientId()).ifPresent(routine -> {
             externalPlanningService.fetchActiveRoutine(command.clientId())
                     .ifPresentOrElse(routine::resync, () -> routine.end(command));
+            activeRoutineRepository.save(routine);
+        });
+    }
+
+    // A client without a synced routine yet keeps the default zone until the next request.
+    @Override
+    public void handle(ChangeTimeZoneCommand command) {
+        activeRoutineRepository.findByClientId(command.clientId())
+                .filter(routine -> routine.changeTimeZone(command.timeZone()))
+                .ifPresent(activeRoutineRepository::save);
+    }
+
+    @Override
+    public void handle(RecordDailyRunCommand command) {
+        activeRoutineRepository.findByClientId(command.clientId()).ifPresent(routine -> {
+            routine.recordDailyRun(command.date());
             activeRoutineRepository.save(routine);
         });
     }

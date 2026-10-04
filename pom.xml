@@ -13,7 +13,7 @@
 
     <groupId>com.formai</groupId>
     <artifactId>formai-api</artifactId>
-    <version>0.1.2</version>
+    <version>0.2.0</version>
     <name>formai-api</name>
     <description>FormAI API</description>
 

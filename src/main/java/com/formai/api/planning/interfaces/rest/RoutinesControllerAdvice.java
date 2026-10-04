@@ -5,6 +5,7 @@ import com.formai.api.planning.domain.exceptions.ClientNotAssignableException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
+import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,11 @@ public class RoutinesControllerAdvice {
     @ExceptionHandler(RoutineNotFoundException.class)
     public ProblemDetail handleRoutineNotFound(RoutineNotFoundException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(TrainingDaysMismatchException.class)
+    public ProblemDetail handleTrainingDaysMismatch(TrainingDaysMismatchException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidRoutineException.class)

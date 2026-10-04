@@ -13,6 +13,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import java.time.DayOfWeek;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -54,6 +55,14 @@ public interface ActiveRoutineJpaMapper {
 
     default RoutineId mapRoutineId(UUID value) {
         return value == null ? null : new RoutineId(value);
+    }
+
+    default String map(ZoneId timeZone) {
+        return timeZone == null ? null : timeZone.getId();
+    }
+
+    default ZoneId mapTimeZone(String timeZone) {
+        return timeZone == null ? null : ZoneId.of(timeZone);
     }
 
     default String mapTrainingDays(Set<DayOfWeek> trainingDays) {

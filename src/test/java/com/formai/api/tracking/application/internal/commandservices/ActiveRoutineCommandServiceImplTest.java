@@ -2,7 +2,9 @@ package com.formai.api.tracking.application.internal.commandservices;
 
 import com.formai.api.tracking.application.internal.outboundservices.acl.ExternalPlanningService;
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
+import com.formai.api.tracking.domain.model.commands.ChangeTimeZoneCommand;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.RecordDailyRunCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
@@ -13,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -135,5 +138,29 @@ class ActiveRoutineCommandServiceImplTest {
         commandService.handle(new EndActiveRoutineCommand(CLIENT_ID, TODAY));
 
         verify(activeRoutineRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldSaveANewTimeZoneOnlyWhenItChanges() {
+        var routine = activeRoutine();
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(routine));
+
+        commandService.handle(new ChangeTimeZoneCommand(CLIENT_ID, ActiveRoutine.DEFAULT_TIME_ZONE));
+        verify(activeRoutineRepository, never()).save(any());
+
+        commandService.handle(new ChangeTimeZoneCommand(CLIENT_ID, ZoneId.of("Europe/Madrid")));
+        verify(activeRoutineRepository).save(routine);
+        assertThat(routine.getTimeZone()).isEqualTo(ZoneId.of("Europe/Madrid"));
+    }
+
+    @Test
+    void shouldRecordTheDailyRun() {
+        var routine = activeRoutine();
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(routine));
+
+        commandService.handle(new RecordDailyRunCommand(CLIENT_ID, TODAY));
+
+        assertThat(routine.getLastDailyRunOn()).isEqualTo(TODAY);
+        verify(activeRoutineRepository).save(routine);
     }
 }

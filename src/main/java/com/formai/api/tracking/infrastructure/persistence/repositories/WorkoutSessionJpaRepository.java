@@ -41,6 +41,11 @@ public interface WorkoutSessionJpaRepository extends JpaRepository<WorkoutSessio
 
     List<WorkoutSessionJpaEntity> findAllByStatusAndScheduledForBefore(String status, LocalDate date);
 
+    List<WorkoutSessionJpaEntity> findAllByClientIdAndStatusAndScheduledForBefore(UUID clientId, String status,
+                                                                               LocalDate date);
+
+    List<WorkoutSessionJpaEntity> findAllByClientIdAndRoutineIdOrderByScheduledForDesc(UUID clientId, UUID routineId);
+
     @Query("select s.clientId, max(s.scheduledFor) from WorkoutSessionJpaEntity s "
             + "where s.clientId in :clientIds and s.status in ('COMPLETED', 'PARTIAL') group by s.clientId")
     List<Object[]> findLastTrainedDates(@Param("clientIds") Collection<UUID> clientIds);
@@ -62,6 +67,10 @@ public interface WorkoutSessionJpaRepository extends JpaRepository<WorkoutSessio
 
     default List<WorkoutSessionJpaEntity> findAllPendingBefore(LocalDate date) {
         return findAllByStatusAndScheduledForBefore("PENDING", date);
+    }
+
+    default List<WorkoutSessionJpaEntity> findAllPendingByClientIdBefore(UUID clientId, LocalDate date) {
+        return findAllByClientIdAndStatusAndScheduledForBefore(clientId, "PENDING", date);
     }
 
     default List<LastWorkout> findLastWorkoutDates(List<UUID> clientIds) {

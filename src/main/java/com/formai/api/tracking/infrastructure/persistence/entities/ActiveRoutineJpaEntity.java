@@ -40,6 +40,13 @@ public class ActiveRoutineJpaEntity {
     @Column(name = "days_json", nullable = false, columnDefinition = "text")
     private String daysJson;
 
+    // IANA time zone id, e.g. America/Lima.
+    @Column(name = "time_zone", nullable = false, length = 64)
+    private String timeZone;
+
+    @Column(name = "last_daily_run_on")
+    private LocalDate lastDailyRunOn;
+
     // public: required by MapStruct, which generates its mapper impl in a different package.
     public ActiveRoutineJpaEntity() {
     }
@@ -114,5 +121,21 @@ public class ActiveRoutineJpaEntity {
 
     public void setTrainingDays(String trainingDays) {
         this.trainingDays = trainingDays;
+    }
+
+    public String getTimeZone() {
+        return timeZone;
+    }
+
+    public void setTimeZone(String timeZone) {
+        this.timeZone = timeZone;
+    }
+
+    public LocalDate getLastDailyRunOn() {
+        return lastDailyRunOn;
+    }
+
+    public void setLastDailyRunOn(LocalDate lastDailyRunOn) {
+        this.lastDailyRunOn = lastDailyRunOn;
     }
 }

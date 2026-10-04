@@ -1,6 +1,7 @@
 package com.formai.api.planning.domain.model.aggregates;
 
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
+import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
 import com.formai.api.planning.domain.model.commands.CreateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.DuplicateRoutineCommand;
 import com.formai.api.planning.domain.model.commands.UpdateRoutineCommand;
@@ -10,6 +11,7 @@ import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.Prescription;
 import com.formai.api.planning.domain.model.valueobjects.RoutineName;
 import com.formai.api.planning.domain.model.valueobjects.RoutineStatus;
+import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -42,6 +44,17 @@ class RoutineTest {
         assertThat(routine.currentVersion().getNumber()).isEqualTo(1);
         assertThat(routine.currentVersion().getAuthor()).isEqualTo(TRAINER_HOLDER_ID);
         assertThat(routine.currentVersion().getSessions()).hasSize(2);
+    }
+
+    @Test
+    void shouldFitOneTrainingDayPerSession() {
+        var routine = routine();
+
+        routine.ensureFits(TrainingDays.ofNames(List.of("MONDAY", "THURSDAY")));
+        assertThatThrownBy(() -> routine.ensureFits(TrainingDays.ofNames(List.of("MONDAY"))))
+                .isInstanceOf(TrainingDaysMismatchException.class);
+        assertThatThrownBy(() -> routine.ensureFits(TrainingDays.everyDay()))
+                .isInstanceOf(TrainingDaysMismatchException.class);
     }
 
     @Test

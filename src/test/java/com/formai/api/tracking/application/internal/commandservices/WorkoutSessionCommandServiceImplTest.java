@@ -8,6 +8,7 @@ import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.FinishWorkoutSessionCommand;
 import com.formai.api.tracking.domain.model.commands.RecordSetCommand;
 import com.formai.api.tracking.domain.model.commands.ScheduleWorkoutSessionCommand;
+import com.formai.api.tracking.domain.model.commands.CloseClientOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.commands.CloseOverdueWorkoutSessionsCommand;
 import com.formai.api.tracking.domain.model.events.SetRecorded;
 import com.formai.api.tracking.domain.model.events.WorkoutSessionFinished;
@@ -206,6 +207,26 @@ class WorkoutSessionCommandServiceImplTest {
         savesReturnTheSession();
 
         commandService.handle(new CloseOverdueWorkoutSessionsCommand(TODAY));
+
+        assertThat(untouched.getStatus()).isEqualTo(ComplianceStatus.SKIPPED);
+        assertThat(started.getStatus()).isEqualTo(ComplianceStatus.PARTIAL);
+        assertThat(started.getFinishedAt()).isNotNull();
+        verify(workoutSessionRepository).save(untouched);
+        verify(workoutSessionRepository).save(started);
+        verify(eventPublisher).publishEvent(new WorkoutSessionSkipped(untouched.getId().value(), CLIENT_ID.value()));
+        verify(eventPublisher).publishEvent(new WorkoutSessionFinished(started.getId().value(), CLIENT_ID.value(),
+                "PARTIAL"));
+    }
+
+    @Test
+    void shouldCloseOverdueSessionsAsSkippedOrPartialOfOneClient() {
+        var untouched = pendingSession(TODAY.minusDays(1));
+        var started = pendingSession(TODAY.minusDays(2));
+        started.recordSet(recordSquat(started));
+        when(workoutSessionRepository.findAllPendingByClientIdBefore(CLIENT_ID, TODAY)).thenReturn(List.of(untouched, started));
+        savesReturnTheSession();
+
+        commandService.handle(new CloseClientOverdueWorkoutSessionsCommand(CLIENT_ID, TODAY));
 
         assertThat(untouched.getStatus()).isEqualTo(ComplianceStatus.SKIPPED);
         assertThat(started.getStatus()).isEqualTo(ComplianceStatus.PARTIAL);

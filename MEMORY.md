@@ -2,9 +2,11 @@
 
 Inter-session project memory. This file contains about 50 lines: summarize or remove content that no longer adds value.
 
-## Current status (2026-10-03)
+## Current status (2026-10-04)
 - The TP (MVP, Sprints 1–2) backend is released (0.1.2, deployed on Railway from `main`): US-001…US-017 and
-  US-033…US-036 are delivered. Suite: 461 tests. Spec is at version 0.4.0.
+  US-033…US-036 are delivered. Suite: 481 tests. Spec is at version 0.4.0.
+- `feature/client-timezone-and-day-validation` (not released): per-client time zone (tracking V3), job every
+  15 min, assignment needs one training day per session (422), latest result per routine day in `active-routines/me`.
 - Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
   machine catalog exists).
 - Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
@@ -19,6 +21,8 @@ Inter-session project memory. This file contains about 50 lines: summarize or re
   trainer. The password is the proof of ownership; without it the answer is the usual 409.
 - Training days per assignment (planning V3, tracking V2): a session exists only on those days, so rest days
   no longer count as skipped and adherence means what the trainer expects.
+- A day is the client's own date (device IANA zone, stored on `ActiveRoutine`), not the server's: on a UTC
+  server the 00:05 job scheduled Peru's next day at 19:05 local time, so today showed as a rest day.
 - COMPLETED needs every prescribed set; the daily closing ends sessions with records as PARTIAL or COMPLETED,
   so every past session has a final status.
 - Swagger tags by purpose in `shared/interfaces/rest/ApiTags`; `AGENTS.md` is the single instruction file.

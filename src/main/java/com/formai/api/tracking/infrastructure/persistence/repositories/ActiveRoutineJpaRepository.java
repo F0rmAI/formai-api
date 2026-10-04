@@ -19,9 +19,11 @@ public interface ActiveRoutineJpaRepository extends JpaRepository<ActiveRoutineJ
 
     List<ActiveRoutineJpaEntity> findAllByClientIdIn(Collection<UUID> clientIds);
 
+    // Active on at least one date of the range: the caller checks each client's own date.
     @Query("select r from ActiveRoutineJpaEntity r "
-            + "where r.startDate <= :date and (r.endDate is null or r.endDate >= :date)")
-    List<ActiveRoutineJpaEntity> findAllActiveOn(@Param("date") LocalDate date);
+            + "where r.startDate <= :latest and (r.endDate is null or r.endDate >= :earliest)")
+    List<ActiveRoutineJpaEntity> findAllActiveBetween(@Param("earliest") LocalDate earliest,
+                                                      @Param("latest") LocalDate latest);
 
     default List<ActiveRoutineJpaEntity> findAllByClientIds(List<UUID> clientIds) {
         return findAllByClientIdIn(clientIds);
