@@ -3,7 +3,6 @@ package com.formai.api.tracking.interfaces.rest.transform;
 import com.formai.api.tracking.domain.model.aggregates.WorkoutSession;
 import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.ExerciseToPerform;
-import com.formai.api.tracking.domain.model.valueobjects.RoutineDay;
 import com.formai.api.tracking.domain.model.valueobjects.RoutineId;
 import com.formai.api.tracking.domain.model.valueobjects.TodayPlan;
 import com.formai.api.tracking.interfaces.rest.resources.ActiveRoutineResource;
@@ -27,14 +26,24 @@ public interface ActiveRoutineAssembler {
     @Mapping(target = "version", source = "routine.version")
     @Mapping(target = "startDate", source = "routine.startDate")
     @Mapping(target = "trainingDays", source = "routine.trainingDays")
-    @Mapping(target = "sessions", source = "routine.days")
+    @Mapping(target = "sessions", expression = "java(sessions(plan))")
     @Mapping(target = "todaySessionOrder", source = "todaySession", qualifiedByName = "todaySessionOrder")
     @Mapping(target = "todayWorkoutSessionId", source = "todaySession", qualifiedByName = "todayWorkoutSessionId")
     ActiveRoutineResource toResource(TodayPlan plan);
 
-    RoutineDayResource toResource(RoutineDay day);
-
     ExerciseToPerformResource toResource(ExerciseToPerform exercise);
+
+    default List<RoutineDayResource> sessions(TodayPlan plan) {
+        return plan.routine().getDays().stream()
+                .map(day -> {
+                    var last = Optional.ofNullable(plan.lastSessionByDay().get(day.order()));
+                    return new RoutineDayResource(day.order(), day.label(),
+                            day.exercises().stream().map(this::toResource).toList(),
+                            last.map(WorkoutSession::getScheduledFor).orElse(null),
+                            last.map(session -> session.getStatus().name()).orElse(null));
+                })
+                .toList();
+    }
 
     @Named("todaySessionOrder")
     default Integer todaySessionOrder(Optional<WorkoutSession> todaySession) {

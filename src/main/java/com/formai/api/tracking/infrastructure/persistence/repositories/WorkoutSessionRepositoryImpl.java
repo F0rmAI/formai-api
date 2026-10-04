@@ -6,6 +6,7 @@ import com.formai.api.tracking.domain.model.valueobjects.ExerciseId;
 import com.formai.api.tracking.domain.model.valueobjects.LastWorkout;
 import com.formai.api.tracking.domain.model.valueobjects.Pagination;
 import com.formai.api.tracking.domain.model.valueobjects.ReportPeriod;
+import com.formai.api.tracking.domain.model.valueobjects.RoutineId;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionId;
 import com.formai.api.tracking.domain.model.valueobjects.WorkoutSessionPage;
 import com.formai.api.tracking.domain.repositories.WorkoutSessionRepository;
@@ -83,6 +84,18 @@ public class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     @Override
     public List<WorkoutSession> findAllPendingBefore(LocalDate date) {
         return jpaRepository.findAllPendingBefore(date).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<WorkoutSession> findAllPendingByClientIdBefore(ClientId clientId, LocalDate date) {
+        return jpaRepository.findAllPendingByClientIdBefore(clientId.value(), date).stream()
+                .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<WorkoutSession> findAllByClientIdAndRoutineId(ClientId clientId, RoutineId routineId) {
+        return jpaRepository.findAllByClientIdAndRoutineIdOrderByScheduledForDesc(clientId.value(), routineId.value())
+                .stream().map(mapper::toDomain).toList();
     }
 
     @Override

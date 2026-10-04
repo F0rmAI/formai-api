@@ -16,7 +16,7 @@ public interface ActiveRoutineRepository {
 
     List<ActiveRoutine> findAllByRoutineId(RoutineId routineId);
 
-    List<ActiveRoutine> findAllActiveOn(LocalDate date);
+    List<ActiveRoutine> findAllActiveBetween(LocalDate earliest, LocalDate latest);
 
     List<ActiveRoutine> findAllByClientIds(List<ClientId> clientIds);
 }

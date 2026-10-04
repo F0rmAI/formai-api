@@ -1,7 +1,9 @@
 package com.formai.api.tracking.domain.services;
 
 import com.formai.api.tracking.domain.model.aggregates.ActiveRoutine;
+import com.formai.api.tracking.domain.model.commands.ChangeTimeZoneCommand;
 import com.formai.api.tracking.domain.model.commands.EndActiveRoutineCommand;
+import com.formai.api.tracking.domain.model.commands.RecordDailyRunCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 
@@ -14,4 +16,8 @@ public interface ActiveRoutineCommandService {
     void handle(SyncActiveRoutinesOfRoutineCommand command);
 
     void handle(EndActiveRoutineCommand command);
+
+    void handle(ChangeTimeZoneCommand command);
+
+    void handle(RecordDailyRunCommand command);
 }

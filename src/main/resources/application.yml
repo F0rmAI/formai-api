@@ -40,7 +40,7 @@ cors:
 tracking:
   jobs:
     workout-session-daily:
-      cron: ${TRACKING_DAILY_JOB_CRON:0 5 0 * * *}   # every day at 00:05 (server time zone)
+      cron: ${TRACKING_DAILY_JOB_CRON:0 */15 * * * *}   # every 15 minutes: each client's day starts at their own midnight
 
 notifications:
   password-reset-url: ${PASSWORD_RESET_URL:http://localhost:5173/password-reset?token=}   # the token is appended

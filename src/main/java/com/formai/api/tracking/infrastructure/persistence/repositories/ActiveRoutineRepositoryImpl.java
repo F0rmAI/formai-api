@@ -40,8 +40,8 @@ public class ActiveRoutineRepositoryImpl implements ActiveRoutineRepository {
     }
 
     @Override
-    public List<ActiveRoutine> findAllActiveOn(LocalDate date) {
-        return jpaRepository.findAllActiveOn(date).stream().map(mapper::toDomain).toList();
+    public List<ActiveRoutine> findAllActiveBetween(LocalDate earliest, LocalDate latest) {
+        return jpaRepository.findAllActiveBetween(earliest, latest).stream().map(mapper::toDomain).toList();
     }
 
     @Override
