@@ -3,6 +3,7 @@ package com.formai.api.planning.interfaces.rest;
 import com.formai.api.planning.domain.exceptions.ExerciseAlreadyExistsException;
 import com.formai.api.planning.domain.exceptions.ExerciseInUseException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.InvalidMuscleGroupException;
 import com.formai.api.planning.domain.exceptions.MachineNotPublishedException;
 import com.formai.api.planning.domain.model.commands.ArchiveExerciseCommand;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
@@ -11,7 +12,11 @@ import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineComman
 import com.formai.api.planning.domain.model.commands.RestoreExerciseCommand;
 import com.formai.api.planning.domain.model.queries.GetExerciseByIdQuery;
 import com.formai.api.planning.domain.model.queries.GetExercisesQuery;
-import com.formai.api.planning.domain.model.valueobjects.ExercisePage;
+import com.formai.api.planning.domain.model.aggregates.Exercise;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseOrigin;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseSummary;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseSummaryPage;
+import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
 import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.services.ExerciseCommandService;
@@ -57,7 +62,7 @@ class ExercisesControllerTest {
 
     private static final RequestPostProcessor TRAINER = user(TRAINER_HOLDER_ID).roles("TRAINER");
 
-    private static final String SQUAT_BODY = "{\"name\":\"Squat\",\"muscleGroup\":\"Legs\",\"equipment\":\"Barbell\"}";
+    private static final String SQUAT_BODY = "{\"name\":\"Squat\",\"muscleGroup\":\"Cuádriceps\",\"equipment\":\"Barbell\"}";
 
     @Autowired
     MockMvc mockMvc;
@@ -73,11 +78,14 @@ class ExercisesControllerTest {
         when(exerciseCommandService.handle(argThat((CreateExerciseCommand command) ->
                 command.holderId().equals(TRAINER_HOLDER_ID) && command.name().value().equals("Squat"))))
                 .thenReturn(Optional.of(squat()));
+        returnsSummaryOf(squat(), 0);
 
         mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY).with(TRAINER))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.origin").value("OWN"))
+                .andExpect(jsonPath("$.routineCount").value(0))
                 .andExpect(jsonPath("$.id").value(SQUAT_ID.value().toString()))
-                .andExpect(jsonPath("$.muscleGroup").value("Legs"))
+                .andExpect(jsonPath("$.muscleGroup").value("Cuádriceps"))
                 .andExpect(jsonPath("$.equipment").value("Barbell"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
@@ -85,7 +93,7 @@ class ExercisesControllerTest {
     @Test
     void shouldReturn400WhenTheNameIsMissing() throws Exception {
         mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"muscleGroup\":\"Legs\"}").with(TRAINER))
+                        .content("{\"muscleGroup\":\"Cuádriceps\"}").with(TRAINER))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(exerciseCommandService);
@@ -101,20 +109,40 @@ class ExercisesControllerTest {
     }
 
     @Test
-    void shouldListTheCatalogFilteredBySearchAndStatus() throws Exception {
-        when(exerciseQueryService.handle(argThat((GetExercisesQuery query) ->
-                query.search().equals(Optional.of("squ")) && query.status().equals(Optional.of(ExerciseStatus.ACTIVE)))))
-                .thenReturn(new ExercisePage(List.of(squat()), 0, 20, 1, 1));
+    void shouldReturn422ForAMuscleGroupThatIsNotStandard() throws Exception {
+        when(exerciseCommandService.handle(any(CreateExerciseCommand.class)))
+                .thenThrow(new InvalidMuscleGroupException("Legs"));
 
-        mockMvc.perform(get("/api/v1/exercises").param("search", "squ").param("status", "active").with(TRAINER))
+        mockMvc.perform(post("/api/v1/exercises").contentType(MediaType.APPLICATION_JSON).content(SQUAT_BODY).with(TRAINER))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void shouldListTheCatalogFilteredBySearchMuscleGroupOriginAndStatus() throws Exception {
+        when(exerciseQueryService.handle(argThat((GetExercisesQuery query) ->
+                query.search().equals(Optional.of("squ")) && query.status().equals(Optional.of(ExerciseStatus.ACTIVE))
+                        && query.muscleGroup().equals(Optional.of(new MuscleGroup("Cuádriceps")))
+                        && query.origin().equals(Optional.of(ExerciseOrigin.GLOBAL)))))
+                .thenReturn(new ExerciseSummaryPage(List.of(new ExerciseSummary(globalSquat(), 3)), 0, 20, 1, 1));
+
+        mockMvc.perform(get("/api/v1/exercises").param("search", "squ").param("status", "active")
+                        .param("muscleGroup", "Cuádriceps").param("origin", "global").with(TRAINER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Squat"))
+                .andExpect(jsonPath("$.content[0].origin").value("GLOBAL"))
+                .andExpect(jsonPath("$.content[0].routineCount").value(3))
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
     void shouldReturn400ForAnUnknownStatus() throws Exception {
         mockMvc.perform(get("/api/v1/exercises").param("status", "DELETED").with(TRAINER))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn400ForAnUnknownOrigin() throws Exception {
+        mockMvc.perform(get("/api/v1/exercises").param("origin", "SHARED").with(TRAINER))
                 .andExpect(status().isBadRequest());
     }
 
@@ -148,6 +176,9 @@ class ExercisesControllerTest {
         archived.archive();
         when(exerciseCommandService.handle(any(ArchiveExerciseCommand.class))).thenReturn(Optional.of(archived));
         when(exerciseCommandService.handle(any(RestoreExerciseCommand.class))).thenReturn(Optional.of(squat()));
+        when(exerciseQueryService.handle(any(GetExerciseByIdQuery.class)))
+                .thenReturn(Optional.of(new ExerciseSummary(archived, 0)))
+                .thenReturn(Optional.of(new ExerciseSummary(squat(), 0)));
 
         mockMvc.perform(post("/api/v1/exercises/" + SQUAT_ID.value() + "/archivals").with(TRAINER))
                 .andExpect(status().isCreated())
@@ -178,6 +209,7 @@ class ExercisesControllerTest {
         linked.linkToMachine(new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID,
                 new MachineId(machineId)));
         when(exerciseCommandService.handle(any(LinkExerciseToMachineCommand.class))).thenReturn(Optional.of(linked));
+        returnsSummaryOf(linked, 1);
 
         mockMvc.perform(put("/api/v1/exercises/{id}/machine-link", SQUAT_ID.value())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"machineId\":\"" + machineId + "\"}").with(TRAINER))
@@ -221,5 +253,16 @@ class ExercisesControllerTest {
                         .with(user(TRAINER_HOLDER_ID).roles("CLIENT")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(exerciseCommandService);
+    }
+
+    private void returnsSummaryOf(Exercise exercise, long routineCount) {
+        when(exerciseQueryService.handle(any(GetExerciseByIdQuery.class)))
+                .thenReturn(Optional.of(new ExerciseSummary(exercise, routineCount)));
+    }
+
+    private static Exercise globalSquat() {
+        var exercise = squat();
+        exercise.setHolderId(null);
+        return exercise;
     }
 }

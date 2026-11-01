@@ -69,7 +69,7 @@ class RoutineCommandServiceImplTest {
     @Test
     void shouldCreateTheRoutineCopyingNamesFromTheCatalog() {
         // Arrange
-        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
+        when(exerciseRepository.findAvailableById(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
         savesReturnTheRoutine();
 
         // Act
@@ -84,7 +84,7 @@ class RoutineCommandServiceImplTest {
 
     @Test
     void shouldRejectAnExerciseThatIsNotInTheCatalog() {
-        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+        when(exerciseRepository.findAvailableById(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> commandService.handle(new CreateRoutineCommand(TRAINER_HOLDER_ID,
                 new RoutineName("Legs only"), legsDayWithoutNames())))
@@ -96,7 +96,7 @@ class RoutineCommandServiceImplTest {
     void shouldRejectAnArchivedExercise() {
         var archived = squat();
         archived.archive();
-        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(archived));
+        when(exerciseRepository.findAvailableById(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(archived));
 
         assertThatThrownBy(() -> commandService.handle(new CreateRoutineCommand(TRAINER_HOLDER_ID,
                 new RoutineName("Legs only"), legsDayWithoutNames())))
@@ -107,7 +107,7 @@ class RoutineCommandServiceImplTest {
     void shouldSaveAChangeAsANewVersionAndPublishRoutineUpdated() {
         var routine = routine();
         when(routineRepository.findByIdAndHolderId(routine.getId(), TRAINER_HOLDER_ID)).thenReturn(Optional.of(routine));
-        when(exerciseRepository.findByIdAndHolderId(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
+        when(exerciseRepository.findAvailableById(SQUAT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(squat()));
         savesReturnTheRoutine();
 
         var updated = commandService.handle(new UpdateRoutineCommand(routine.getId(), TRAINER_HOLDER_ID,

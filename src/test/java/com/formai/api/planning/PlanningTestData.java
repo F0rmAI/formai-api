@@ -33,7 +33,7 @@ public final class PlanningTestData {
 
     public static Exercise squat() {
         var exercise = Exercise.create(new CreateExerciseCommand(TRAINER_HOLDER_ID, new ExerciseName("Squat"),
-                new MuscleGroup("Legs"), Optional.of("Barbell")));
+                new MuscleGroup("Cuádriceps"), Optional.of("Barbell")));
         exercise.setId(SQUAT_ID);
         return exercise;
     }

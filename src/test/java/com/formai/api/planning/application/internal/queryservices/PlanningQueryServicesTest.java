@@ -9,6 +9,12 @@ import com.formai.api.planning.domain.model.queries.GetClientPlanQuery;
 import com.formai.api.planning.domain.model.queries.GetRoutineVersionsQuery;
 import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
+import com.formai.api.planning.domain.model.queries.GetExercisesQuery;
+import com.formai.api.planning.domain.model.queries.GetMuscleGroupsQuery;
+import com.formai.api.planning.domain.model.valueobjects.ExercisePage;
+import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
+import com.formai.api.planning.domain.model.valueobjects.Pagination;
+import com.formai.api.planning.domain.repositories.ExerciseRepository;
 import com.formai.api.planning.domain.repositories.RoutineRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,11 +22,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static com.formai.api.planning.PlanningTestData.CLIENT_ID;
 import static com.formai.api.planning.PlanningTestData.START_DATE;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
+import static com.formai.api.planning.PlanningTestData.squat;
 import static com.formai.api.planning.PlanningTestData.emptyPlan;
 import static com.formai.api.planning.PlanningTestData.routine;
 import static com.formai.api.planning.PlanningTestData.twoSessions;
@@ -39,6 +47,37 @@ class PlanningQueryServicesTest {
 
     @Mock
     ExternalClientsService externalClientsService;
+
+    @Mock
+    ExerciseRepository exerciseRepository;
+
+    @Test
+    void shouldListTheGlobalAndOwnExercisesWithHowManyRoutinesUseThem() {
+        var squat = squat();
+        var query = new GetExercisesQuery(TRAINER_HOLDER_ID, Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), new Pagination(0, 20));
+        when(exerciseRepository.findAllAvailableTo(TRAINER_HOLDER_ID, Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), new Pagination(0, 20)))
+                .thenReturn(new ExercisePage(List.of(squat), 0, 20, 1, 1));
+        when(routineRepository.countByHolderIdAndExerciseId(TRAINER_HOLDER_ID, squat.getId())).thenReturn(2L);
+
+        var page = new ExerciseQueryServiceImpl(exerciseRepository, routineRepository).handle(query);
+
+        assertThat(page.items()).singleElement().satisfies(summary -> {
+            assertThat(summary.exercise()).isSameAs(squat);
+            assertThat(summary.routineCount()).isEqualTo(2);
+        });
+        assertThat(page.totalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldServeTheStandardMuscleGroups() {
+        assertThat(new ExerciseQueryServiceImpl(exerciseRepository, routineRepository)
+                .handle(new GetMuscleGroupsQuery()))
+                .extracting(MuscleGroup::value)
+                .contains("Pectoral", "Cuádriceps", "Cuerpo completo")
+                .hasSize(11);
+    }
 
     @Test
     void shouldListTheVersionsMostRecentFirst() {

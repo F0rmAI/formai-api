@@ -3,7 +3,9 @@ package com.formai.api.planning.infrastructure.persistence.repositories;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.aggregates.Exercise;
 import com.formai.api.planning.domain.model.aggregates.Routine;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseOrigin;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
+import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
 import com.formai.api.planning.domain.model.valueobjects.Pagination;
 import com.formai.api.planning.infrastructure.persistence.entities.ClientPlanJpaEntity;
 import com.formai.api.planning.infrastructure.persistence.entities.ExerciseJpaEntity;
@@ -71,20 +73,21 @@ class PlanningRepositoriesImplTest {
     }
 
     @Test
-    void shouldSearchTheTrainersCatalogSortedByName() {
+    void shouldSearchTheGlobalAndOwnCatalogSortedByName() {
         var entity = new ExerciseJpaEntity();
         var exercise = new Exercise();
-        when(exerciseJpaRepository.findAllByHolderId(eq(TRAINER_HOLDER_ID), eq(Optional.of("squ")),
-                eq(Optional.of("ACTIVE")), any(Pageable.class)))
+        when(exerciseJpaRepository.findAllAvailableTo(eq(TRAINER_HOLDER_ID), eq(Optional.of("squ")),
+                eq(Optional.of("Cuádriceps")), eq(Optional.of("GLOBAL")), eq(Optional.of("ACTIVE")), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(entity), PageRequest.of(0, 20), 1));
         when(exerciseMapper.toDomain(entity)).thenReturn(exercise);
 
-        var page = new ExerciseRepositoryImpl(exerciseJpaRepository, exerciseMapper).findAllByHolderId(
-                TRAINER_HOLDER_ID, Optional.of("squ"), Optional.of(ExerciseStatus.ACTIVE), new Pagination(0, 20));
+        var page = new ExerciseRepositoryImpl(exerciseJpaRepository, exerciseMapper).findAllAvailableTo(
+                TRAINER_HOLDER_ID, Optional.of("squ"), Optional.of(new MuscleGroup("Cuádriceps")),
+                Optional.of(ExerciseOrigin.GLOBAL), Optional.of(ExerciseStatus.ACTIVE), new Pagination(0, 20));
 
         var pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(exerciseJpaRepository).findAllByHolderId(eq(TRAINER_HOLDER_ID), eq(Optional.of("squ")),
-                eq(Optional.of("ACTIVE")), pageable.capture());
+        verify(exerciseJpaRepository).findAllAvailableTo(eq(TRAINER_HOLDER_ID), eq(Optional.of("squ")),
+                eq(Optional.of("Cuádriceps")), eq(Optional.of("GLOBAL")), eq(Optional.of("ACTIVE")), pageable.capture());
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "name"));
         assertThat(page.items()).containsExactly(exercise);
         assertThat(page.totalElements()).isEqualTo(1);

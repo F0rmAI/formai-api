@@ -2,15 +2,21 @@ package com.formai.api.planning.application.internal.commandservices;
 
 import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.planning.domain.exceptions.AssigneeNotFoundException;
+import com.formai.api.planning.domain.exceptions.AssignmentNotFoundException;
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.planning.domain.exceptions.ClientNotAssignableException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
+import com.formai.api.planning.domain.model.commands.PersonalizeAssignmentCommand;
 import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
+import com.formai.api.planning.domain.model.events.AssignmentPersonalized;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
+import com.formai.api.planning.domain.model.valueobjects.AssignmentNote;
+import com.formai.api.planning.domain.model.valueobjects.PrescriptionAdjustment;
 import com.formai.api.planning.domain.model.valueobjects.RoutineId;
 import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
@@ -22,12 +28,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static com.formai.api.planning.PlanningTestData.CLIENT_ID;
+import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.START_DATE;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.planning.PlanningTestData.emptyPlan;
@@ -196,5 +204,47 @@ class ClientPlanCommandServiceImplTest {
                 START_DATE));
 
         verify(clientPlanRepository, never()).save(any(ClientPlan.class));
+    }
+
+    @Test
+    void shouldPersonalizeTheCurrentAssignmentAndPublishAssignmentPersonalized() {
+        var routine = routine();
+        var plan = emptyPlan();
+        plan.assign(new AssignRoutineCommand(routine.getId(), CLIENT_ID, TRAINER_HOLDER_ID, START_DATE, TWO_DAYS));
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(true));
+        when(clientPlanRepository.findByClientIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(plan));
+        when(routineRepository.findById(routine.getId())).thenReturn(Optional.of(routine));
+        when(clientPlanRepository.save(any(ClientPlan.class))).thenAnswer(call -> call.getArgument(0));
+
+        var saved = commandService.handle(new PersonalizeAssignmentCommand(CLIENT_ID, TRAINER_HOLDER_ID,
+                Optional.of(new AssignmentNote("Mind the knee")),
+                List.of(new PrescriptionAdjustment(1, SQUAT_ID, new BigDecimal("40"), 120)))).orElseThrow();
+
+        assertThat(saved.currentAssignment()).hasValueSatisfying(current -> {
+            assertThat(current.getNote().value()).isEqualTo("Mind the knee");
+            assertThat(current.getAdjustments()).hasSize(1);
+        });
+        verify(eventPublisher).publishEvent(new AssignmentPersonalized(CLIENT_ID.value(), routine.getId().value()));
+    }
+
+    @Test
+    void shouldDenyPersonalizingAnotherTrainersClient() {
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commandService.handle(new PersonalizeAssignmentCommand(CLIENT_ID, TRAINER_HOLDER_ID,
+                Optional.empty(), List.of())))
+                .isInstanceOf(ClientAccessDeniedException.class);
+        verify(clientPlanRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldAnswerNotFoundWhenThereIsNoCurrentAssignmentToPersonalize() {
+        when(externalClientsService.isActiveClientOfTrainer(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(true));
+        when(clientPlanRepository.findByClientIdAndHolderId(CLIENT_ID, TRAINER_HOLDER_ID)).thenReturn(Optional.of(emptyPlan()));
+
+        assertThatThrownBy(() -> commandService.handle(new PersonalizeAssignmentCommand(CLIENT_ID, TRAINER_HOLDER_ID,
+                Optional.empty(), List.of())))
+                .isInstanceOf(AssignmentNotFoundException.class);
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }

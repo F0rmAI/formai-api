@@ -1,8 +1,10 @@
 package com.formai.api.planning.domain.model.aggregates;
 
+import com.formai.api.planning.domain.exceptions.InvalidMuscleGroupException;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
 import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseOrigin;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
 import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
@@ -15,6 +17,7 @@ import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.planning.PlanningTestData.squat;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExerciseTest {
 
@@ -26,7 +29,7 @@ class ExerciseTest {
         // Assert
         assertThat(exercise.getHolderId()).isEqualTo(TRAINER_HOLDER_ID);
         assertThat(exercise.getName().value()).isEqualTo("Squat");
-        assertThat(exercise.getMuscleGroup().value()).isEqualTo("Legs");
+        assertThat(exercise.getMuscleGroup().value()).isEqualTo("Cuádriceps");
         assertThat(exercise.getEquipment()).isEqualTo("Barbell");
         assertThat(exercise.getStatus()).isEqualTo(ExerciseStatus.ACTIVE);
     }
@@ -34,7 +37,7 @@ class ExerciseTest {
     @Test
     void shouldLeaveEquipmentEmptyWhenNoneIsGiven() {
         var exercise = Exercise.create(new CreateExerciseCommand(TRAINER_HOLDER_ID, new ExerciseName(" Push-up "),
-                new MuscleGroup("Chest"), Optional.of("  ")));
+                new MuscleGroup("Pectoral"), Optional.of("  ")));
 
         assertThat(exercise.getName().value()).isEqualTo("Push-up");
         assertThat(exercise.getEquipment()).isNull();
@@ -65,5 +68,23 @@ class ExerciseTest {
         exercise.linkToMachine(new LinkExerciseToMachineCommand(SQUAT_ID, TRAINER_HOLDER_ID, machineId));
 
         assertThat(exercise.getMachineId()).isEqualTo(machineId);
+    }
+
+    @Test
+    void shouldRejectAMuscleGroupThatIsNotStandard() {
+        assertThatThrownBy(() -> Exercise.create(new CreateExerciseCommand(TRAINER_HOLDER_ID, new ExerciseName("Squat"),
+                new MuscleGroup("Legs"), Optional.empty())))
+                .isInstanceOf(InvalidMuscleGroupException.class);
+    }
+
+    @Test
+    void shouldTellAnOwnExerciseFromAGlobalOne() {
+        var own = squat();
+        var global = squat();
+        global.setHolderId(null);
+
+        assertThat(own.origin()).isEqualTo(ExerciseOrigin.OWN);
+        assertThat(global.isGlobal()).isTrue();
+        assertThat(global.origin()).isEqualTo(ExerciseOrigin.GLOBAL);
     }
 }

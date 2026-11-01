@@ -17,6 +17,8 @@ import com.formai.api.planning.domain.model.events.AssignmentClosed;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.queries.GetActiveAssignmentByClientIdQuery;
 import com.formai.api.planning.domain.model.valueobjects.ActiveAssignment;
+import com.formai.api.planning.domain.model.valueobjects.AssignmentNote;
+import com.formai.api.planning.domain.model.valueobjects.PrescriptionAdjustment;
 import com.formai.api.planning.domain.model.valueobjects.TrainingDays;
 import com.formai.api.planning.domain.services.ClientPlanCommandService;
 import com.formai.api.planning.domain.services.ClientPlanQueryService;
@@ -27,10 +29,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static com.formai.api.planning.PlanningTestData.CLIENT_ID;
+import static com.formai.api.planning.PlanningTestData.SQUAT_ID;
 import static com.formai.api.planning.PlanningTestData.START_DATE;
 import static com.formai.api.planning.PlanningTestData.TRAINER_HOLDER_ID;
 import static com.formai.api.planning.PlanningTestData.routine;
@@ -73,6 +78,26 @@ class PlanningIntegrationPointsTest {
         assertThat(squat.exerciseName()).isEqualTo("Squat");
         assertThat(squat.sets()).isEqualTo(3);
         assertThat(squat.targetLoadKg()).isEqualByComparingTo("60");
+    }
+
+    @Test
+    void shouldPublishTheClientsPersonalizedPrescriptionsAndTheTrainersNote() {
+        var routine = routine();
+        when(clientPlanQueryService.handle(new GetActiveAssignmentByClientIdQuery(CLIENT_ID)))
+                .thenReturn(Optional.of(new ActiveAssignment(CLIENT_ID, routine, START_DATE, TrainingDays.everyDay(),
+                        new AssignmentNote("Mind the knee"),
+                        List.of(new PrescriptionAdjustment(1, SQUAT_ID, new BigDecimal("40"), 150)))));
+
+        var snapshot = new PlanningContextFacadeImpl(clientPlanQueryService).fetchActiveRoutine(CLIENT_ID.value())
+                .orElseThrow();
+
+        var squat = snapshot.sessions().getFirst().exercises().getFirst();
+        assertThat(squat.targetLoadKg()).isEqualByComparingTo("40");
+        assertThat(squat.restSeconds()).isEqualTo(150);
+        assertThat(squat.sets()).isEqualTo(3);
+        var deadlift = snapshot.sessions().get(1).exercises().getFirst();
+        assertThat(deadlift.targetLoadKg()).isEqualByComparingTo("100");
+        assertThat(snapshot.trainerNote()).isEqualTo("Mind the knee");
     }
 
     @Test

@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 class ExerciseCommandServiceImplTest {
 
     private static final CreateExerciseCommand CREATE_SQUAT = new CreateExerciseCommand(TRAINER_HOLDER_ID,
-            new ExerciseName("Squat"), new MuscleGroup("Legs"), Optional.empty());
+            new ExerciseName("Squat"), new MuscleGroup("Cuádriceps"), Optional.empty());
 
     @Mock
     ExerciseRepository exerciseRepository;
@@ -61,7 +61,7 @@ class ExerciseCommandServiceImplTest {
     @Test
     void shouldAddTheExerciseToTheCatalog() {
         // Arrange
-        when(exerciseRepository.existsByHolderIdAndName(TRAINER_HOLDER_ID, CREATE_SQUAT.name())).thenReturn(false);
+        when(exerciseRepository.existsAvailableByName(TRAINER_HOLDER_ID, CREATE_SQUAT.name())).thenReturn(false);
         savesReturnTheExercise();
 
         // Act
@@ -74,7 +74,7 @@ class ExerciseCommandServiceImplTest {
 
     @Test
     void shouldRejectADuplicateName() {
-        when(exerciseRepository.existsByHolderIdAndName(TRAINER_HOLDER_ID, CREATE_SQUAT.name())).thenReturn(true);
+        when(exerciseRepository.existsAvailableByName(TRAINER_HOLDER_ID, CREATE_SQUAT.name())).thenReturn(true);
 
         assertThatThrownBy(() -> commandService.handle(CREATE_SQUAT))
                 .isInstanceOf(ExerciseAlreadyExistsException.class);
