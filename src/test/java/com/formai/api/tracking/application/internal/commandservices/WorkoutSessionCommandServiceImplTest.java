@@ -132,6 +132,42 @@ class WorkoutSessionCommandServiceImplTest {
     }
 
     @Test
+    void shouldRefreshPersonalizedLoadWithoutReplacingAnUntouchedSession() {
+        var existing = pendingSession(TODAY);
+        var routine = activeRoutine();
+        var changed = new com.formai.api.tracking.domain.model.valueobjects.ExerciseToPerform(
+                SQUAT.exerciseId(), SQUAT.exerciseName(), SQUAT.sets(), SQUAT.reps(),
+                new BigDecimal("12.5"), 0);
+        routine.setDays(List.of(new com.formai.api.tracking.domain.model.valueobjects.RoutineDay(
+                LEGS_DAY.order(), LEGS_DAY.label(), List.of(changed))));
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(routine));
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(existing));
+        savesReturnTheSession();
+
+        var saved = commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY)).orElseThrow();
+
+        assertThat(saved.getId()).isEqualTo(existing.getId());
+        assertThat(saved.getExercises().getFirst().getToPerform().targetLoadKg()).isEqualByComparingTo("12.5");
+        verify(workoutSessionRepository, never()).delete(any());
+    }
+
+    @Test
+    void shouldPreserveTheOriginalPrescriptionOnceTheClientRecordedASet() {
+        var existing = pendingSession(TODAY);
+        existing.recordSet(recordSquat(existing));
+        var routine = activeRoutine();
+        routine.setVersion(2);
+        when(activeRoutineRepository.findByClientId(CLIENT_ID)).thenReturn(Optional.of(routine));
+        when(workoutSessionRepository.findByClientIdAndScheduledFor(CLIENT_ID, TODAY)).thenReturn(Optional.of(existing));
+
+        var saved = commandService.handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY)).orElseThrow();
+
+        assertThat(saved.getRoutineVersion()).isEqualTo(existing.getRoutineVersion());
+        assertThat(saved.getExercises().getFirst().getSets()).hasSize(1);
+        verify(workoutSessionRepository, never()).save(any());
+    }
+
+    @Test
     void shouldNotScheduleWhenTheRoutineIsNoLongerActive() {
         var ended = activeRoutine();
         ended.end(new EndActiveRoutineCommand(CLIENT_ID, TODAY.minusDays(1)));

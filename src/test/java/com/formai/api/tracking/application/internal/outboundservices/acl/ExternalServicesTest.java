@@ -44,7 +44,8 @@ class ExternalServicesTest {
         var exerciseId = UUID.randomUUID();
         var snapshot = new ActiveRoutineSnapshot(CLIENT_ID.value(), ROUTINE_ID.value(), "Strength 12 weeks", 3,
                 START_DATE, Set.of("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"), List.of(new SessionSnapshot(1, "Day A · Legs", List.of(
-                        new PrescribedExerciseSnapshot(exerciseId, "Squat", 4, 8, new BigDecimal("70"), 120)))));
+                        new PrescribedExerciseSnapshot(exerciseId, "Squat", 4, 8, new BigDecimal("70"), 120)))),
+                "Warm up 10 minutes first");
         when(planningContextFacade.fetchActiveRoutine(CLIENT_ID.value())).thenReturn(Optional.of(snapshot));
 
         // Act
@@ -58,6 +59,7 @@ class ExternalServicesTest {
         assertThat(exercise.exerciseId()).isEqualTo(new ExerciseId(exerciseId));
         assertThat(exercise.sets()).isEqualTo(4);
         assertThat(exercise.targetLoadKg()).isEqualByComparingTo("70");
+        assertThat(plan.trainerNote()).isEqualTo("Warm up 10 minutes first");
     }
 
     @Test

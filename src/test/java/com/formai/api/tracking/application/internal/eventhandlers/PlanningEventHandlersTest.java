@@ -1,6 +1,7 @@
 package com.formai.api.tracking.application.internal.eventhandlers;
 
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
+import com.formai.api.planning.domain.model.events.AssignmentPersonalized;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.events.RoutineUpdated;
 import com.formai.api.tracking.domain.exceptions.ActiveRoutineNotFoundException;
@@ -10,6 +11,9 @@ import com.formai.api.tracking.domain.model.commands.SyncActiveRoutineCommand;
 import com.formai.api.tracking.domain.model.commands.SyncActiveRoutinesOfRoutineCommand;
 import com.formai.api.tracking.domain.model.valueobjects.ClientId;
 import com.formai.api.tracking.domain.model.queries.GetClientTodayQuery;
+import com.formai.api.tracking.domain.model.queries.GetActiveRoutinesAtQuery;
+
+import java.util.List;
 import com.formai.api.tracking.domain.services.ActiveRoutineCommandService;
 import com.formai.api.tracking.domain.services.ActiveRoutineQueryService;
 import com.formai.api.tracking.domain.services.WorkoutSessionCommandService;
@@ -50,6 +54,25 @@ class PlanningEventHandlersTest {
                 workoutSessionCommandService);
 
         handler.scheduleToday(new RoutineAssigned(CLIENT_ID.value(), ROUTINE_ID.value(), TODAY));
+
+        verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
+    }
+
+    @Test
+    void shouldSyncTheClientsRoutineWhenTheAssignmentIsPersonalized() {
+        new AssignmentPersonalizedEventHandler(activeRoutineCommandService, activeRoutineQueryService, workoutSessionCommandService)
+                .on(new AssignmentPersonalized(CLIENT_ID.value(), ROUTINE_ID.value()));
+
+        verify(activeRoutineCommandService).handle(new SyncActiveRoutineCommand(CLIENT_ID));
+    }
+
+    @Test
+    void shouldRefreshTodaysUntouchedWorkoutAfterPersonalization() {
+        when(activeRoutineQueryService.handle(any(GetClientTodayQuery.class))).thenReturn(TODAY);
+        var handler = new AssignmentPersonalizedEventHandler(activeRoutineCommandService,
+                activeRoutineQueryService, workoutSessionCommandService);
+
+        handler.scheduleToday(new AssignmentPersonalized(CLIENT_ID.value(), ROUTINE_ID.value()));
 
         verify(workoutSessionCommandService).handle(new ScheduleWorkoutSessionCommand(CLIENT_ID, TODAY));
     }
@@ -97,11 +120,34 @@ class PlanningEventHandlersTest {
 
     @Test
     void shouldSyncEveryClientFollowingARoutineWhenItIsUpdated() {
-        var handler = new RoutineUpdatedEventHandler(activeRoutineCommandService);
+        var handler = new RoutineUpdatedEventHandler(activeRoutineCommandService, activeRoutineQueryService, workoutSessionCommandService);
 
         handler.on(new RoutineUpdated(ROUTINE_ID.value(), 2));
 
         verify(activeRoutineCommandService).handle(new SyncActiveRoutinesOfRoutineCommand(ROUTINE_ID));
+    }
+
+    @Test
+    void shouldRefreshTodaysUntouchedSessionAfterARoutineUpdate() {
+        var routine = activeRoutine();
+        when(activeRoutineQueryService.handle(any(GetActiveRoutinesAtQuery.class))).thenReturn(List.of(routine));
+        var handler = new RoutineUpdatedEventHandler(activeRoutineCommandService,
+                activeRoutineQueryService, workoutSessionCommandService);
+
+        handler.scheduleToday(new RoutineUpdated(ROUTINE_ID.value(), 2));
+
+        verify(workoutSessionCommandService).handle(any(ScheduleWorkoutSessionCommand.class));
+    }
+
+    @Test
+    void shouldIgnoreOtherRoutinesWhenRefreshingAnUpdatedRoutine() {
+        when(activeRoutineQueryService.handle(any(GetActiveRoutinesAtQuery.class))).thenReturn(List.of(activeRoutine()));
+        var handler = new RoutineUpdatedEventHandler(activeRoutineCommandService,
+                activeRoutineQueryService, workoutSessionCommandService);
+
+        handler.scheduleToday(new RoutineUpdated(java.util.UUID.randomUUID(), 2));
+
+        verify(workoutSessionCommandService, never()).handle(any(ScheduleWorkoutSessionCommand.class));
     }
 
     @Test
