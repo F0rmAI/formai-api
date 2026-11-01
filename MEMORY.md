@@ -1,58 +1,39 @@
 # MEMORY.md - FormAI API
 
-Inter-session project memory. This file contains about 50 lines: summarize or remove content that no longer adds value.
+Inter-session project memory. Keep this file concise (about 50 lines); never store credentials.
 
-## Current status (2026-10-04)
-- The TP (MVP, Sprints 1–2) backend is released (0.1.2, deployed on Railway from `main`): US-001…US-017 and
-  US-033…US-036 are delivered. Suite: 481 tests. Spec is at version 0.4.0.
-- `feature/client-timezone-and-day-validation` (not released): per-client time zone (tracking V3), job every
-  15 min, assignment needs one training day per session (422), latest result per routine day in `active-routines/me`.
-- Ahead of TB2 (not required for the TP): US-018 progress charts; US-030 machine link (answers 422 until the
-  machine catalog exists).
-- Class diagrams come from one model, `Diagramas/Clases/_modelo/formai-api.yaml` (outside the repo, package
-  `com.formai.api`); never edit the `.puml`. `FORMAI_API_REPO=<this repo> ./build.sh` rebuilds TP and TF and
-  compares them with the code.
+## Current status (2026-10-08)
+- Branch `feature/global-exercises-and-assignment-personalization`, based on develop aligned with main (0.2.0). Work is local, without commits, push or deployment.
+- Global + own catalog, muscle groups, assignment load/rest overrides and trainer notes are implemented. Planning V4/V5 and tracking V4 applied successfully to local PostgreSQL.
+- Full suite: 511 tests, no failures/errors/skips, including ArchitectureTest. Local API integration: 23 checks pass.
+- Web–API–Android flow completed: registration, activation, assignment, personalization and a recorded set visible to the trainer. iOS 27 displays the personalized routine too.
+- Requirements are v0.5.0. OneDrive class model is v3.1.0; TP/TF validation, REST and FR/US trace audits pass without warnings. TF matches all 446 backend classes.
+- Evidence is outside repositories under `formai/validation/2026-10-08-global-exercises`.
 
-## Decisions (and why)
-- The trainer registers a client with the name only; the client chooses the email on activation. The pending
-  account only carries the activation code (iam V6, clients V2).
-- Changing trainer keeps the account: from the second redemption on, the code of another trainer redeemed
-  with the client's email and current password moves the client record, and so all its history, to that
-  trainer. The password is the proof of ownership; without it the answer is the usual 409.
-- Training days per assignment (planning V3, tracking V2): a session exists only on those days, so rest days
-  no longer count as skipped and adherence means what the trainer expects.
-- A day is the client's own date (device IANA zone, stored on `ActiveRoutine`), not the server's: on a UTC
-  server the 00:05 job scheduled Peru's next day at 19:05 local time, so today showed as a rest day.
-- COMPLETED needs every prescribed set; the daily closing ends sessions with records as PARTIAL or COMPLETED,
-  so every past session has a final status.
-- Swagger tags by purpose in `shared/interfaces/rest/ApiTags`; `AGENTS.md` is the single instruction file.
-- Sessions: 30-min JWT + 7-day rotating refresh cookie; bcrypt cost 12; consent stored with its text version.
-- Email through Brevo's HTTP API (`BREVO_API_KEY`, `xkeysib-…`), not SMTP: Railway blocks outbound SMTP below
-  the Pro plan (the send timed out and never reached Brevo). Retried up to 5 times; body redacted once closed.
+## Decisions
+- Global exercises have a null holder; mutations resolve only owned exercises and return 404 for globals/foreign entries. Existing exercises remain owned; duplicate checks include global and own names regardless of case.
+- New exercises require a standard muscle group; legacy values still load. `GET /muscle-groups` supplies the finite list; exercise resources include origin and routineCount.
+- Each assignment owns its optional note (500 chars) and overrides keyed by session order/exercise id. Blank fields remove overrides; zero is valid. Loads allow decimals; rest is an integer.
+- Jackson rejects fractional JSON values for integer fields rather than silently truncating them (400).
+- Planning snapshots apply only overrides whose exercise/session still exists in the latest version. Stale overrides remain harmless after routine changes.
+- Personalization and routine-update handlers first sync ActiveRoutine, then schedule/refresh today's workout in a separate ordered transaction. Only untouched pending sessions change; started/closed sessions keep their prescription and version.
+- The trainer registers only a name; the client chooses email/password and accepts versioned consent on activation. Another trainer's code plus the existing password transfers the client and history.
+- A day belongs to the client's IANA zone, stored on ActiveRoutine. Daily processing runs every 15 minutes and catches up on startup; training days must match routine session count.
+- COMPLETED requires all prescribed sets. Daily closing finishes sessions with records as PARTIAL/COMPLETED; missing sessions become SKIPPED.
+- JWT: 30-minute access cookie and 7-day rotating refresh cookie. Reusing a revoked refresh token revokes the account's sessions.
+- Email uses Brevo HTTP, not SMTP. Keep its API key and sender private.
 
-## Lessons learned and mistakes to avoid
-- Controller tests: use `.with(user(<real id>).roles(...))`, not `@WithMockUser` (holderId = `getName()`).
-- An exception in an `ApplicationReadyEvent` listener aborts startup: catch it.
-- A `try/catch` inside a `@Transactional` listener does not stop the failure: catch outside the transaction.
-- Two eager `List` collections on one entity need `@OrderColumn`; same class name in two modules needs an
-  explicit bean name.
-- Unit tests did not catch two date bugs that a real run did: an assignment closed "today" still applies
-  today, and the first assignment in effect is not the latest. Run the flow against the API after such changes.
-- Stop the running API before `mvn test`: both write `target/` and the suite fails to discover tests.
-- Local runs need Docker Desktop up. To test without sending emails: `NOTIFICATIONS_DISPATCHER_DELAY=PT2H`.
+## Pitfalls
+- Stop the running API before Maven tests: both write target/.
+- Local native apps need JWT_COOKIE_SECURE=false. Disable real outbound mail with blank BREVO_API_KEY and SMTP_FROM_EMAIL; a long dispatcher delay alone does not prevent the initial run.
+- Controller tests use user(realId).roles(...), not @WithMockUser, because the holder id is Authentication.getName().
+- An ApplicationReadyEvent failure aborts startup; catch it. Catching inside a transactional method does not undo a rollback-only transaction.
+- Two eager List collections need @OrderColumn. Same class name in different modules needs an explicit bean name.
+- Class diagrams come only from OneDrive `Diagramas/Clases/_modelo/formai-api.yaml`; never hand-edit generated .puml. build.sh renders PNGs locally before copying to OneDrive to avoid streaming timeouts.
+- REST profile permits only the finite `GET /api/v1/muscle-groups` List[String] response; negative audit checks still reject other list types.
 
-## Known limits (accepted)
-- After a transfer, the previous trainer's routines appear without a name in the assignment history.
-- A routine assigned the same day as a transfer stays visible until the new trainer assigns one.
-- Handlers without self-healing (see their comments): `UserRegistered`→Trainer, `ClientDeactivated`→close
-  assignment, tracking's `RoutineAssigned` sync, and `ClientAccountTransferred` (the trainer invites again).
-
-## Next steps (to operate the MVP)
-- Front ends: the web must send `trainingDays` when assigning and stop asking for the client's email; it
-  needs a `/password-reset` page. The app must send email and `consentVersion` on activation.
-- Set `BREVO_API_KEY`, `SMTP_FROM_EMAIL` and `SMTP_FROM_NAME` in every `.env` (SMTP_HOST/PORT/USER/PASSWORD are gone).
-- Deployment: Dockerfile + `backend` service in compose, Caddy with TLS and a subdomain, on the Linux VM.
-- Daily Postgres backup with 7-day retention and one tested restore; external monitor on `/actuator/health`.
-- Quality evidence: k6 (P95 < 300 ms), OWASP ZAP baseline, JaCoCo ≥ 70 % on domain/application.
-- Audit backlog: clients↔iam share one transaction; iam and tracking command services lack `@Transactional`;
-  ArchUnit layered rule; tests with a real JWT and a context-load test; Brevo call inside the DB transaction.
+## Known limits / next work
+- A transferred client's previous trainer routine has no accessible name. Tracking RoutineAssigned synchronization lacks automatic recovery if its first sync fails.
+- TB2 machine catalog/recognition remains outside this increment; only own exercises can be linked by trainers.
+- Existing architecture backlog: clients/iam shared transaction, missing command-service transaction boundaries, real-JWT context tests and Brevo HTTP inside a DB transaction.
+- Deployment, operational backup/restore, load/security checks and production signing require their own work; this session did not deploy.

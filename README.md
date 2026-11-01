@@ -134,9 +134,10 @@ both contexts decoupled. It publishes `ClientDeactivated` and `ClientTransferred
 The Planning Context is responsible for the trainer's exercises, routines and assignments. It
 includes the following features:
 
-- Keep an exercise catalog per trainer; an exercise used by a routine can only be archived,
-  and an archived exercise can be restored.
-- Link an exercise to a published machine of the catalog, so its usage guide goes with the
+- Share a seeded global exercise catalog and complement it with exercises owned by each trainer.
+  Global exercises are read-only; own exercises can be archived, restored or deleted when unused.
+  Names are checked against both catalogs; muscle groups come from a finite standard list.
+- Link an owned exercise to a published machine of the catalog, so its usage guide goes with the
   exercise in the clients' routines. The machine catalog belongs to the final increment and
   does not exist yet: `ExternalCatalogService` answers that no machine is published, so every
   link answers `422` until that context is built.
@@ -146,6 +147,8 @@ includes the following features:
 - Assign a routine to one or several active clients from a start date and with the days of the
   week they train (every day when omitted), closing the previous assignment. A routine with no
   open assignment becomes `CLOSED` and can be assigned again without duplicating it.
+- Personalize each assignment with nonnegative target loads and integer rests, plus an optional
+  note of up to 500 characters. Valid overrides survive new versions; recorded workouts stay intact.
 
 It also exposes an Open Host Service (OHS) for in-process communication with other contexts,
 `planning.interfaces.acl.PlanningContextFacade`, offering the following capabilities:
@@ -156,7 +159,7 @@ It relies on an anti-corruption layer (ACL) to consume the Clients Context, tran
 contract into this context's own model. It reacts to the `ClientDeactivated` domain event
 published by the Clients Context to close the client's assignment, and to `ClientTransferred` to
 close it and hand the assignment history over to the new trainer, keeping both contexts
-decoupled. It publishes `RoutineAssigned`, `RoutineUpdated` and `AssignmentClosed`.
+decoupled. It publishes `RoutineAssigned`, `RoutineUpdated`, `AssignmentClosed` and `AssignmentPersonalized`.
 
 ### Tracking Context
 
@@ -406,7 +409,7 @@ configured with credentials (`shared/config/CorsConfig`, `CORS_ALLOWED_ORIGIN` i
 User stories of the requirements specification (`FormAI_Requirements_Specification.md`) that are
 ready to use. New development starts from this table.
 
-The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 to US-036;
+The partial delivery (TP, the MVP of Sprints 1–2) covers US-001 to US-017 plus US-033 to US-038;
 all of them are delivered. US-018 and US-030 belong to the final increment (TB2) and are delivered
 ahead of it, US-030 partially (see below).
 
@@ -420,23 +423,25 @@ ahead of it, US-030 partially (see below).
 | US-006 | As a trainer, list, search and deactivate my clients | `GET /api/v1/clients?search&status&page&size` · `GET /api/v1/clients/{id}` · `PUT /api/v1/clients/{id}` · `POST /api/v1/clients/{id}/deactivations` · `GET /api/v1/client-overviews?search&status&page&size` | Lists and filters only my clients with their current routine and last workout, renames them, and deactivates them keeping their history until the client joins another trainer |
 | US-007 | As a trainer, record each client's body profile | `GET /api/v1/clients/{id}/body-profile` · `PUT /api/v1/clients/{id}/body-profile` | Stores goal, height, weight and restrictions, rejecting out-of-range values and keeping every weight change with its date |
 | US-008 | As a trainer, create routines with sessions, exercises, sets, reps and loads | `POST /api/v1/routines` · `GET /api/v1/routines?page&size` · `GET /api/v1/routines/{id}` · `POST /api/v1/routines/{id}/duplicates` | Creates routines as `DRAFT`, rejects invalid prescriptions and duplicates a routine without its clients |
-| US-009 | As a trainer, keep my own exercise catalog | `POST /api/v1/exercises` · `GET /api/v1/exercises?search&status&page&size` · `GET /api/v1/exercises/{id}` · `DELETE /api/v1/exercises/{id}` · `POST /api/v1/exercises/{id}/archivals` | Creates exercises without duplicate names, and only archives an exercise a routine uses |
-| US-010 | As a trainer, assign a routine to one or several clients | `POST /api/v1/routines/{id}/assignments` · `GET /api/v1/clients/{id}/assignments` | Assigns the routine to active clients from a start date and with their training days (`trainingDays`, every day when omitted), exactly one per session of the routine (`422` otherwise), closing their previous assignment |
+| US-009 | As a trainer, use the global catalog and complement it with my own exercises | `GET /api/v1/muscle-groups` · `POST /api/v1/exercises` · `GET /api/v1/exercises?search&muscleGroup&origin&status&page&size` · `GET /api/v1/exercises/{id}` · `DELETE /api/v1/exercises/{id}` · `POST /api/v1/exercises/{id}/archivals` | Lists global and own exercises with origin and routine usage; filters by muscle group and origin; rejects duplicate names against both catalogs and nonstandard groups; global exercises are read-only |
+| US-010 | As a trainer, assign a routine to one or several clients | `POST /api/v1/routines/{id}/assignments` · `GET /api/v1/clients/{id}/assignments` | Assigns the routine to active clients from a start date and with their training days (`trainingDays`, every day when omitted), exactly one per session of the routine (`422` otherwise), closing their previous assignment; accepts an optional note of up to 500 characters |
 | US-011 | As a trainer, modify the routine assigned to a client | `PUT /api/v1/routines/{id}` · `GET /api/v1/routines/{id}/versions` | Saves every change as a new version with its date and author, leaving past workouts untouched |
-| US-012 | As a client, see my current routine and pick today's session or any other | `GET /api/v1/active-routines/me` | Shows today's session, the training days and every session of the current routine with its latest result; today is the client's own date (`X-Client-Timezone`); no session of the day on a rest day, and `404` when no routine is assigned |
+| US-012 | As a client, see my current routine and pick today's session or any other | `GET /api/v1/active-routines/me` | Shows today's session, training days, personalized loads/rests, the trainer note and every session with its latest result; today is the client's own date (`X-Client-Timezone`); no session of the day on a rest day, and `404` when no routine is assigned |
 | US-013 | As a client, record the load and reps of each set | `POST /api/v1/workout-sessions/{id}/sets` · `POST /api/v1/workout-sessions/{id}/corrections` | Records each set with its date and time, rejects invalid values and corrects a set without duplicating it |
 | US-014 | As a client, finish my session and see its compliance status | `POST /api/v1/workout-sessions/{id}/completions` | Finishes the session as `COMPLETED` when every prescribed set is recorded or, once confirmed, `PARTIAL`; the daily job closes unfinished sessions as `SKIPPED`, `PARTIAL` or `COMPLETED` |
 | US-015 | As a client, check my workout history | `GET /api/v1/workout-sessions?from&to&page&size` · `GET /api/v1/workout-sessions/{id}` | Lists my sessions newest first with status and volume, filters by dates and shows each set |
 | US-016 | As a trainer, review the workouts each client recorded | `GET /api/v1/clients/{id}/workout-sessions?from&to&page&size` | Shows a client's sessions with status and per-set detail; another trainer's client answers `403` |
 | US-017 | As a trainer, see each client's adherence and basic metrics | `GET /api/v1/clients/{id}/progress-reports?from&to` | Returns adherence, sessions by status, and each exercise's heaviest load and volume in its first and last session; 0 % when there is no data |
 | US-018 | As a trainer or client, see load and volume progress charts | `GET /api/v1/progress-charts/me?exerciseId&weeks` · `GET /api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Returns heaviest load and volume per date over 4, 8 or 12 weeks, flagging when there is not enough data |
-| US-033 | As a trainer, restore an archived exercise of my catalog | `POST /api/v1/exercises/{id}/restorations` | Makes the exercise available again for new routines |
+| US-033 | As a trainer, restore an archived exercise of my catalog | `POST /api/v1/exercises/{id}/restorations` | Restores only an exercise owned by the signed-in trainer; global and foreign exercises answer `404` |
 | US-034 | As a trainer, assign a closed routine again, adjusting it if needed | `POST /api/v1/routines/{id}/assignments` · `PUT /api/v1/routines/{id}` | A routine with no open assignment becomes `CLOSED`; assigning it again reopens it without duplicating it, and editing it first adds a version |
 | US-035 | As a client, join another trainer keeping my account and my history | `POST /api/v1/account-activations` | Redeeming another trainer's code with my email and my current password moves my account, body profile and workouts to that trainer and closes my previous assignment; a wrong password answers `409` |
 | US-036 | As a client, see my name and email in the app | `GET /api/v1/client-profiles/me` | Returns the signed-in client's own name and email |
+| US-037 | As a trainer, personalize load and rest for one client without copying the routine | `PUT /api/v1/clients/{id}/assignments/current` | Replaces assignment overrides, permits decimals for load and nonnegative integers for rest, keeps zero valid, removes empty overrides, preserves valid overrides across routine versions and refreshes only untouched sessions |
+| US-038 | As a trainer, leave a note visible in the client's app | `POST /api/v1/routines/{id}/assignments` · `PUT /api/v1/clients/{id}/assignments/current` · `GET /api/v1/active-routines/me` | Stores an optional assignment note of at most 500 characters and exposes it as `trainerNote`; a blank note removes it |
 
 Partially delivered: **US-030** (link exercises to published machines,
-`PUT /api/v1/exercises/{id}/machine-link`) answers `422` until the machine catalog exists.
+`PUT /api/v1/exercises/{id}/machine-link`) allows only owned exercises and answers `422` until the machine catalog exists; global links belong to the future administrator scope.
 
 ## API Endpoints
 
@@ -459,11 +464,13 @@ Partially delivered: **US-030** (link exercises to published machines,
 | `GET` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `403` `404` | Trainer |
 | `PUT` | `/api/v1/clients/{id}/body-profile` | Clients | `200` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/clients/{id}/assignments` | Routines | `200` | `403` | Trainer |
+| `PUT` | `/api/v1/clients/{id}/assignments/current` | Routines | `200` | `400` `403` `404` `422` | Trainer |
 | `GET` | `/api/v1/clients/{id}/workout-sessions?from&to&page&size` | Workouts | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}/progress-reports?from&to` | Progress | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/clients/{id}/progress-charts?exerciseId&weeks` | Progress | `200` | `400` `403` | Trainer |
-| `POST` | `/api/v1/exercises` | Exercises | `201` | `400` `403` `409` | Trainer |
-| `GET` | `/api/v1/exercises?search&status&page&size` | Exercises | `200` | `400` `403` | Trainer |
+| `GET` | `/api/v1/muscle-groups` | Exercises | `200` | `403` | Trainer |
+| `POST` | `/api/v1/exercises` | Exercises | `201` | `400` `403` `409` `422` | Trainer |
+| `GET` | `/api/v1/exercises?search&muscleGroup&origin&status&page&size` | Exercises | `200` | `400` `403` | Trainer |
 | `GET` | `/api/v1/exercises/{id}` | Exercises | `200` | `403` `404` | Trainer |
 | `DELETE` | `/api/v1/exercises/{id}` | Exercises | `204` | `403` `404` `409` | Trainer |
 | `POST` | `/api/v1/exercises/{id}/archivals` | Exercises | `201` | `403` `404` | Trainer |
@@ -511,7 +518,7 @@ reference to copy when adding a new one: `UserTest` (domain), `UserCommandServic
 `UserRepositoryImplTest` (persistence) and one `@WebMvcTest` per controller, which import
 the real `SecurityConfig`.
 
-The suite has 459 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
+The suite has 511 tests across every layer of `iam`, `clients`, `planning`, `tracking` and
 `notifications`, plus the ArchUnit boundary rules.
 
 CI (`.github/workflows/ci.yml`) runs the full suite against an ephemeral PostgreSQL on
