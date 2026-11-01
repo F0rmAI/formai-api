@@ -3,6 +3,7 @@ package com.formai.api.planning.interfaces.rest;
 import com.formai.api.planning.domain.exceptions.ExerciseAlreadyExistsException;
 import com.formai.api.planning.domain.exceptions.ExerciseInUseException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.InvalidMuscleGroupException;
 import com.formai.api.planning.domain.exceptions.MachineNotPublishedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -28,6 +29,11 @@ public class ExercisesControllerAdvice {
     @ExceptionHandler(ExerciseInUseException.class)
     public ProblemDetail handleExerciseInUse(ExerciseInUseException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidMuscleGroupException.class)
+    public ProblemDetail handleInvalidMuscleGroup(InvalidMuscleGroupException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 
     @ExceptionHandler(MachineNotPublishedException.class)

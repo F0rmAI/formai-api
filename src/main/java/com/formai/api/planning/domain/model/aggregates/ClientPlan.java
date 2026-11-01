@@ -1,8 +1,11 @@
 package com.formai.api.planning.domain.model.aggregates;
 
+import com.formai.api.planning.domain.exceptions.AssignmentNotFoundException;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
+import com.formai.api.planning.domain.model.commands.PersonalizeAssignmentCommand;
 import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.entities.Assignment;
+import com.formai.api.planning.domain.model.entities.RoutineVersion;
 import com.formai.api.planning.domain.model.valueobjects.AssignmentPeriod;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
 import com.formai.api.planning.domain.model.valueobjects.ClientPlanId;
@@ -39,10 +42,18 @@ public class ClientPlan {
         // which also repairs a plan left with the previous one after a failed transfer.
         this.holderId = command.holderId();
         var assignment = new Assignment(command.routineId(), AssignmentPeriod.startingOn(command.startDate()),
-                command.trainingDays());
+                command.trainingDays(), command.note().orElse(null), List.of());
         this.assignments = new ArrayList<>(assignments);
         this.assignments.add(assignment);
         return assignment;
+    }
+
+    // The trainer adapts the current assignment to this client (FR-032, FR-033) without touching the
+    // routine, which other clients may follow too.
+    public Assignment personalizeCurrentAssignment(PersonalizeAssignmentCommand command, RoutineVersion version) {
+        var current = currentAssignment().orElseThrow(AssignmentNotFoundException::new);
+        current.personalize(command.note().orElse(null), command.adjustments(), version);
+        return current;
     }
 
     public void closeCurrentAssignment(LocalDate endDate) {

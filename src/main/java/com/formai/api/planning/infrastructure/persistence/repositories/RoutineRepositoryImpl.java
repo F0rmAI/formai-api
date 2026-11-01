@@ -55,4 +55,9 @@ public class RoutineRepositoryImpl implements RoutineRepository {
     public boolean existsByHolderIdAndExerciseId(String holderId, ExerciseId exerciseId) {
         return jpaRepository.existsByHolderIdAndExerciseId(holderId, exerciseId.value());
     }
+
+    @Override
+    public long countByHolderIdAndExerciseId(String holderId, ExerciseId exerciseId) {
+        return jpaRepository.countByHolderIdAndExerciseId(holderId, exerciseId.value());
+    }
 }

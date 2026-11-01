@@ -19,4 +19,7 @@ public interface RoutineRepository {
     RoutinePage findAllByHolderId(String holderId, Pagination pagination);
 
     boolean existsByHolderIdAndExerciseId(String holderId, ExerciseId exerciseId);
+
+    // Routines of the trainer whose versions prescribe the exercise.
+    long countByHolderIdAndExerciseId(String holderId, ExerciseId exerciseId);
 }

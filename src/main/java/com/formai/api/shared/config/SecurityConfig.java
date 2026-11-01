@@ -37,8 +37,8 @@ public class SecurityConfig {
                         // Roles are additive (iam.domain.model.valueobjects.Role) and land as
                         // ROLE_<name> authorities via JwtAuthenticationFilter (FR-002): the web
                         // app is for trainers, the mobile app for clients. Any other role gets 403.
-                        .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/routines/**",
-                                "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
+                        .requestMatchers("/api/v1/clients/**", "/api/v1/exercises/**", "/api/v1/muscle-groups/**",
+                                "/api/v1/routines/**", "/api/v1/client-overviews/**").hasAuthority("ROLE_TRAINER")
                         .requestMatchers("/api/v1/active-routines/**", "/api/v1/workout-sessions/**",
                                 "/api/v1/progress-charts/**", "/api/v1/client-profiles/**")
                         .hasAuthority("ROLE_CLIENT")

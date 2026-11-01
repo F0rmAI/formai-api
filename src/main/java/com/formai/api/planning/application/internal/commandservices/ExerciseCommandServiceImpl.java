@@ -37,7 +37,7 @@ public class ExerciseCommandServiceImpl implements ExerciseCommandService {
     @Override
     @Transactional
     public Optional<Exercise> handle(CreateExerciseCommand command) {
-        if (exerciseRepository.existsByHolderIdAndName(command.holderId(), command.name())) {
+        if (exerciseRepository.existsAvailableByName(command.holderId(), command.name())) {
             throw new ExerciseAlreadyExistsException(command.name().value());
         }
         return Optional.of(exerciseRepository.save(Exercise.create(command)));
@@ -80,6 +80,7 @@ public class ExerciseCommandServiceImpl implements ExerciseCommandService {
         return Optional.of(exerciseRepository.save(exercise));
     }
 
+    // Only the trainer's own exercises change: a global one is read-only and answers as not found.
     private Exercise findOwnExercise(ExerciseId exerciseId, String holderId) {
         return exerciseRepository.findByIdAndHolderId(exerciseId, holderId)
                 .orElseThrow(ExerciseNotFoundException::new);

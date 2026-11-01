@@ -2,14 +2,18 @@ package com.formai.api.planning.application.internal.commandservices;
 
 import com.formai.api.planning.application.internal.outboundservices.acl.ExternalClientsService;
 import com.formai.api.planning.domain.exceptions.AssigneeNotFoundException;
+import com.formai.api.planning.domain.exceptions.AssignmentNotFoundException;
+import com.formai.api.planning.domain.exceptions.ClientAccessDeniedException;
 import com.formai.api.planning.domain.exceptions.ClientNotAssignableException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.model.aggregates.ClientPlan;
 import com.formai.api.planning.domain.model.commands.AssignRoutineCommand;
 import com.formai.api.planning.domain.model.commands.CloseAssignmentCommand;
+import com.formai.api.planning.domain.model.commands.PersonalizeAssignmentCommand;
 import com.formai.api.planning.domain.model.commands.TransferClientPlanCommand;
 import com.formai.api.planning.domain.model.entities.Assignment;
 import com.formai.api.planning.domain.model.events.AssignmentClosed;
+import com.formai.api.planning.domain.model.events.AssignmentPersonalized;
 import com.formai.api.planning.domain.model.events.RoutineAssigned;
 import com.formai.api.planning.domain.model.valueobjects.ClientId;
 import com.formai.api.planning.domain.repositories.ClientPlanRepository;
@@ -59,6 +63,25 @@ public class ClientPlanCommandServiceImpl implements ClientPlanCommandService {
         previous.ifPresent(closed -> publishClosed(command.clientId(), closed));
         eventPublisher.publishEvent(new RoutineAssigned(command.clientId().value(), command.routineId().value(),
                 command.startDate()));
+        return Optional.of(saved);
+    }
+
+    // Only the trainer's own client (403 otherwise, as when reading the plan) with a current assignment.
+    @Override
+    @Transactional
+    public Optional<ClientPlan> handle(PersonalizeAssignmentCommand command) {
+        if (externalClientsService.isActiveClientOfTrainer(command.clientId(), command.holderId()).isEmpty()) {
+            throw new ClientAccessDeniedException();
+        }
+        var plan = clientPlanRepository.findByClientIdAndHolderId(command.clientId(), command.holderId())
+                .orElseThrow(AssignmentNotFoundException::new);
+        var current = plan.currentAssignment().orElseThrow(AssignmentNotFoundException::new);
+        var routine = routineRepository.findById(current.getRoutineId())
+                .orElseThrow(RoutineNotFoundException::new);
+        plan.personalizeCurrentAssignment(command, routine.currentVersion());
+        var saved = clientPlanRepository.save(plan);
+        eventPublisher.publishEvent(new AssignmentPersonalized(command.clientId().value(),
+                current.getRoutineId().value()));
         return Optional.of(saved);
     }
 

@@ -41,7 +41,8 @@ public class PlanningContextFacadeImpl implements PlanningContextFacade {
                 version.getNumber(),
                 assignment.startDate(),
                 new LinkedHashSet<>(assignment.trainingDays().names()),
-                version.getSessions().stream().map(this::toSnapshot).toList());
+                assignment.personalizedSessions().stream().map(this::toSnapshot).toList(),
+                assignment.note() == null ? null : assignment.note().value());
     }
 
     private SessionSnapshot toSnapshot(RoutineSession session) {

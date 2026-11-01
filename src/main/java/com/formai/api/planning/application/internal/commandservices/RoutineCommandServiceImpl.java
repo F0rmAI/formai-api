@@ -102,7 +102,7 @@ public class RoutineCommandServiceImpl implements RoutineCommandService {
     }
 
     private PrescribedExercise named(String holderId, PrescribedExercise prescribed) {
-        var exercise = exerciseRepository.findByIdAndHolderId(prescribed.getExerciseId(), holderId)
+        var exercise = exerciseRepository.findAvailableById(prescribed.getExerciseId(), holderId)
                 .orElseThrow(ExerciseNotFoundException::new);
         if (!exercise.isActive()) {
             throw new InvalidRoutineException("Exercise '" + exercise.getName().value()

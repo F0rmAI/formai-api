@@ -1,12 +1,13 @@
 package com.formai.api.planning.interfaces.rest.transform;
 
-import com.formai.api.planning.domain.model.aggregates.Exercise;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
 import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.queries.GetExercisesQuery;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
-import com.formai.api.planning.domain.model.valueobjects.ExercisePage;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseOrigin;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseSummary;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseSummaryPage;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
 import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
@@ -28,10 +29,15 @@ import java.util.UUID;
 @Mapper(componentModel = "spring")
 public interface ExerciseAssembler {
 
-    ExerciseResource toResource(Exercise exercise);
+    default ExerciseResource toResource(ExerciseSummary summary) {
+        var exercise = summary.exercise();
+        return new ExerciseResource(exercise.getId().value(), exercise.getName().value(),
+                exercise.getMuscleGroup().value(), exercise.getEquipment(), map(exercise.getMachineId()),
+                exercise.getStatus().name(), exercise.origin().name(), summary.routineCount());
+    }
 
     @Mapping(target = "content", source = "items")
-    ExercisePageResource toResource(ExercisePage page);
+    ExercisePageResource toResource(ExerciseSummaryPage page);
 
     @Mapping(target = "holderId", source = "holderId")
     @Mapping(target = "name", source = "resource.name")
@@ -44,9 +50,23 @@ public interface ExerciseAssembler {
         return new LinkExerciseToMachineCommand(new ExerciseId(exerciseId), holderId, new MachineId(resource.machineId()));
     }
 
-    default GetExercisesQuery toQuery(String holderId, String search, String status, int page, int size) {
+    default GetExercisesQuery toQuery(String holderId, String search, String muscleGroup, String origin,
+                                      String status, int page, int size) {
         return new GetExercisesQuery(holderId, Optional.ofNullable(search).filter(value -> !value.isBlank()),
-                toStatus(status), new Pagination(page, size));
+                Optional.ofNullable(muscleGroup).filter(value -> !value.isBlank()).map(MuscleGroup::new),
+                toOrigin(origin), toStatus(status), new Pagination(page, size));
+    }
+
+    default Optional<ExerciseOrigin> toOrigin(String origin) {
+        if (origin == null || origin.isBlank()) {
+            return Optional.empty();
+        }
+        return Arrays.stream(ExerciseOrigin.values())
+                .filter(value -> value.name().equalsIgnoreCase(origin))
+                .findFirst()
+                .map(Optional::of)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Origin must be GLOBAL or OWN"));
     }
 
     default Optional<ExerciseStatus> toStatus(String status) {

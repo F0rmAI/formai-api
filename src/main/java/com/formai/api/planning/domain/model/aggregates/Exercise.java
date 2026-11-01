@@ -1,9 +1,11 @@
 package com.formai.api.planning.domain.model.aggregates;
 
+import com.formai.api.planning.domain.exceptions.InvalidMuscleGroupException;
 import com.formai.api.planning.domain.model.commands.CreateExerciseCommand;
 import com.formai.api.planning.domain.model.commands.LinkExerciseToMachineCommand;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseName;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseOrigin;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseStatus;
 import com.formai.api.planning.domain.model.valueobjects.MachineId;
 import com.formai.api.planning.domain.model.valueobjects.MuscleGroup;
@@ -13,6 +15,7 @@ import java.util.UUID;
 public class Exercise {
 
     private ExerciseId id;
+    // null for the exercises of the global catalog, shared by every trainer and read-only for them.
     private String holderId;
     private ExerciseName name;
     private MuscleGroup muscleGroup;
@@ -24,7 +27,11 @@ public class Exercise {
     public Exercise() {
     }
 
+    // A trainer adds an exercise of their own; the global catalog only grows through migrations.
     public static Exercise create(CreateExerciseCommand command) {
+        if (!command.muscleGroup().isStandard()) {
+            throw new InvalidMuscleGroupException(command.muscleGroup().value());
+        }
         var exercise = new Exercise();
         exercise.id = new ExerciseId(UUID.randomUUID());
         exercise.holderId = command.holderId();
@@ -46,6 +53,14 @@ public class Exercise {
     // Whether the machine is published is checked by the application service against the catalog.
     public void linkToMachine(LinkExerciseToMachineCommand command) {
         this.machineId = command.machineId();
+    }
+
+    public boolean isGlobal() {
+        return holderId == null;
+    }
+
+    public ExerciseOrigin origin() {
+        return isGlobal() ? ExerciseOrigin.GLOBAL : ExerciseOrigin.OWN;
     }
 
     public boolean isActive() {

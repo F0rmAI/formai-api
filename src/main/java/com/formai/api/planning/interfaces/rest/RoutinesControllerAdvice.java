@@ -3,6 +3,7 @@ package com.formai.api.planning.interfaces.rest;
 import com.formai.api.planning.domain.exceptions.AssigneeNotFoundException;
 import com.formai.api.planning.domain.exceptions.ClientNotAssignableException;
 import com.formai.api.planning.domain.exceptions.ExerciseNotFoundException;
+import com.formai.api.planning.domain.exceptions.InvalidAdjustmentException;
 import com.formai.api.planning.domain.exceptions.InvalidRoutineException;
 import com.formai.api.planning.domain.exceptions.RoutineNotFoundException;
 import com.formai.api.planning.domain.exceptions.TrainingDaysMismatchException;
@@ -24,6 +25,11 @@ public class RoutinesControllerAdvice {
 
     @ExceptionHandler(TrainingDaysMismatchException.class)
     public ProblemDetail handleTrainingDaysMismatch(TrainingDaysMismatchException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidAdjustmentException.class)
+    public ProblemDetail handleInvalidAdjustment(InvalidAdjustmentException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 

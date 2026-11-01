@@ -4,19 +4,18 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import java.util.UUID;
 
 @Entity
-@Table(name = "exercises", schema = "planning",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"holder_id", "name"}))
+@Table(name = "exercises", schema = "planning")
 public class ExerciseJpaEntity {
 
     @Id
     private UUID id;
 
-    @Column(name = "holder_id", nullable = false, length = 64)
+    // null for the exercises of the global catalog.
+    @Column(name = "holder_id", length = 64)
     private String holderId;
 
     @Column(name = "name", nullable = false, length = 120)

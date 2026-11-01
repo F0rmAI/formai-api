@@ -51,7 +51,8 @@ public class ClientPlanQueryServiceImpl implements ClientPlanQueryService {
                         .or(plan::currentAssignment))
                 .flatMap(assignment -> routineRepository.findById(assignment.getRoutineId())
                         .map(routine -> new ActiveAssignment(query.clientId(), routine,
-                                assignment.getPeriod().startDate(), assignment.getTrainingDays())));
+                                assignment.getPeriod().startDate(), assignment.getTrainingDays(),
+                                assignment.getNote(), assignment.getAdjustments())));
     }
 
     private static boolean isInEffectOn(Assignment assignment, LocalDate date) {

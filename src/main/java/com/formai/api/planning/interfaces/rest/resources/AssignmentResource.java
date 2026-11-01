@@ -10,4 +10,6 @@ public record AssignmentResource(UUID clientId,
                                  LocalDate startDate,
                                  LocalDate endDate,
                                  List<String> trainingDays,
-                                 boolean current) { }
+                                 boolean current,
+                                 String note,
+                                 List<PrescriptionAdjustmentResource> adjustments) { }

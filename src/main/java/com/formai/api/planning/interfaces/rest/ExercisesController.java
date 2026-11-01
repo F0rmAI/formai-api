@@ -7,6 +7,7 @@ import com.formai.api.planning.domain.model.commands.DeleteExerciseCommand;
 import com.formai.api.planning.domain.model.commands.RestoreExerciseCommand;
 import com.formai.api.planning.domain.model.queries.GetExerciseByIdQuery;
 import com.formai.api.planning.domain.model.valueobjects.ExerciseId;
+import com.formai.api.planning.domain.model.valueobjects.ExerciseSummary;
 import com.formai.api.planning.domain.services.ExerciseCommandService;
 import com.formai.api.planning.domain.services.ExerciseQueryService;
 import com.formai.api.planning.interfaces.rest.resources.CreateExerciseResource;
@@ -59,39 +60,45 @@ public class ExercisesController {
     }
 
     @Operation(summary = "Add an exercise to my catalog",
-            description = "Creates an active exercise with a name, a muscle group and optional equipment.")
+            description = "Creates an active exercise of my own with a name, a standard muscle group and optional "
+                    + "equipment, when the name is in neither the global catalog nor mine.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Exercise created",
                     content = @Content(schema = @Schema(implementation = ExerciseResource.class))),
             @ApiResponse(responseCode = "400", description = "Missing name or muscle group, or too long",
                     content = @Content),
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content),
-            @ApiResponse(responseCode = "409", description = "An exercise with this name is already in the catalog",
-                    content = @Content)
+            @ApiResponse(responseCode = "409", description = "An exercise with this name is already in the global "
+                    + "catalog or in mine", content = @Content),
+            @ApiResponse(responseCode = "422", description = "The muscle group is not a standard one",
+                    content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping
     public ResponseEntity<ExerciseResource> create(@Valid @RequestBody CreateExerciseResource resource,
                                                    Authentication authentication) {
         var command = assembler.toCommand(authentication.getName(), resource);
-        return created(exerciseCommandService.handle(command));
+        return created(exerciseCommandService.handle(command), authentication);
     }
 
     @Operation(summary = "List my exercises",
-            description = "The trainer's catalog sorted by name, optionally searched by name and filtered by status.")
+            description = "The global catalog plus the trainer's own exercises, sorted by name, optionally searched "
+                    + "by name and filtered by muscle group, origin (GLOBAL or OWN) and status.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "A page of exercises",
                     content = @Content(schema = @Schema(implementation = ExercisePageResource.class))),
-            @ApiResponse(responseCode = "400", description = "Unknown status, or an invalid page or size",
+            @ApiResponse(responseCode = "400", description = "Unknown origin or status, or an invalid page or size",
                     content = @Content),
             @ApiResponse(responseCode = "403", description = "Missing or invalid JWT cookie, or not a trainer", content = @Content)
     })
     @GetMapping
     public ResponseEntity<ExercisePageResource> getAll(@RequestParam(required = false) String search,
+                                                       @RequestParam(required = false) String muscleGroup,
+                                                       @RequestParam(required = false) String origin,
                                                        @RequestParam(required = false) String status,
                                                        @RequestParam(defaultValue = "0") @Min(0) int page,
                                                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
                                                        Authentication authentication) {
-        var query = assembler.toQuery(authentication.getName(), search, status, page, size);
+        var query = assembler.toQuery(authentication.getName(), search, muscleGroup, origin, status, page, size);
         return ResponseEntity.ok(assembler.toResource(exerciseQueryService.handle(query)));
     }
 
@@ -104,9 +111,7 @@ public class ExercisesController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<ExerciseResource> getById(@PathVariable UUID id, Authentication authentication) {
-        var exercise = exerciseQueryService.handle(new GetExerciseByIdQuery(new ExerciseId(id), authentication.getName()))
-                .orElseThrow(ExerciseNotFoundException::new);
-        return ResponseEntity.ok(assembler.toResource(exercise));
+        return ResponseEntity.ok(assembler.toResource(summaryOf(id, authentication.getName())));
     }
 
     @Operation(summary = "Delete an exercise",
@@ -135,7 +140,7 @@ public class ExercisesController {
     @PostMapping("/{id}/archivals")
     public ResponseEntity<ExerciseResource> archive(@PathVariable UUID id, Authentication authentication) {
         return created(exerciseCommandService.handle(
-                new ArchiveExerciseCommand(new ExerciseId(id), authentication.getName())));
+                new ArchiveExerciseCommand(new ExerciseId(id), authentication.getName())), authentication);
     }
 
     @Operation(summary = "Restore an archived exercise",
@@ -149,7 +154,7 @@ public class ExercisesController {
     @PostMapping("/{id}/restorations")
     public ResponseEntity<ExerciseResource> restore(@PathVariable UUID id, Authentication authentication) {
         return created(exerciseCommandService.handle(
-                new RestoreExerciseCommand(new ExerciseId(id), authentication.getName())));
+                new RestoreExerciseCommand(new ExerciseId(id), authentication.getName())), authentication);
     }
 
     @Operation(summary = "Link an exercise to a machine",
@@ -170,11 +175,17 @@ public class ExercisesController {
                                                         Authentication authentication) {
         var exercise = exerciseCommandService.handle(assembler.toCommand(id, authentication.getName(), resource))
                 .orElseThrow(() -> new IllegalStateException("An exercise command should never return empty"));
-        return ResponseEntity.ok(assembler.toResource(exercise));
+        return ResponseEntity.ok(assembler.toResource(summaryOf(exercise.getId().value(), authentication.getName())));
     }
 
-    private ResponseEntity<ExerciseResource> created(Optional<Exercise> exercise) {
+    private ResponseEntity<ExerciseResource> created(Optional<Exercise> exercise, Authentication authentication) {
         var saved = exercise.orElseThrow(() -> new IllegalStateException("An exercise command should never return empty"));
-        return new ResponseEntity<>(assembler.toResource(saved), HttpStatus.CREATED);
+        return new ResponseEntity<>(assembler.toResource(summaryOf(saved.getId().value(), authentication.getName())),
+                HttpStatus.CREATED);
+    }
+
+    private ExerciseSummary summaryOf(UUID id, String holderId) {
+        return exerciseQueryService.handle(new GetExerciseByIdQuery(new ExerciseId(id), holderId))
+                .orElseThrow(ExerciseNotFoundException::new);
     }
 }

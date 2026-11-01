@@ -22,6 +22,13 @@ public class AssignmentEmbeddable {
     @Column(name = "training_days", nullable = false, length = 70)
     private String trainingDays;
 
+    @Column(name = "note", length = 500)
+    private String note;
+
+    // JSON array of {sessionOrder, exerciseId, targetLoadKg, restSeconds}; '[]' without adjustments.
+    @Column(name = "adjustments_json", nullable = false, columnDefinition = "text")
+    private String adjustmentsJson;
+
     // public: required by MapStruct, which generates its mapper impl in a different package.
     public AssignmentEmbeddable() {
     }
@@ -56,5 +63,21 @@ public class AssignmentEmbeddable {
 
     public void setTrainingDays(String trainingDays) {
         this.trainingDays = trainingDays;
+    }
+
+    public String getNote() {
+        return note;
+    }
+
+    public void setNote(String note) {
+        this.note = note;
+    }
+
+    public String getAdjustmentsJson() {
+        return adjustmentsJson;
+    }
+
+    public void setAdjustmentsJson(String adjustmentsJson) {
+        this.adjustmentsJson = adjustmentsJson;
     }
 }

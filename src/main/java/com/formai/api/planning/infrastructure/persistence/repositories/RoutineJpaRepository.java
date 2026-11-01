@@ -20,6 +20,14 @@ public interface RoutineJpaRepository extends JpaRepository<RoutineJpaEntity, UU
             + "where r.holderId = :holderId and v.sessionsJson like concat('%', :exerciseId, '%')")
     boolean anyVersionMentions(@Param("holderId") String holderId, @Param("exerciseId") String exerciseId);
 
+    @Query("select count(distinct r.id) from RoutineJpaEntity r join r.versions v "
+            + "where r.holderId = :holderId and v.sessionsJson like concat('%', :exerciseId, '%')")
+    long countMentioning(@Param("holderId") String holderId, @Param("exerciseId") String exerciseId);
+
+    default long countByHolderIdAndExerciseId(String holderId, UUID exerciseId) {
+        return countMentioning(holderId, exerciseId.toString());
+    }
+
     default boolean existsByHolderIdAndExerciseId(String holderId, UUID exerciseId) {
         return anyVersionMentions(holderId, exerciseId.toString());
     }
