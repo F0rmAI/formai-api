@@ -24,6 +24,9 @@ public class ActiveRoutineJpaEntity {
     @Column(name = "routine_name", nullable = false, length = 120)
     private String routineName;
 
+    @Column(name = "trainer_note", length = 500)
+    private String trainerNote;
+
     @Column(name = "version", nullable = false)
     private int version;
 
@@ -137,5 +140,13 @@ public class ActiveRoutineJpaEntity {
 
     public void setLastDailyRunOn(LocalDate lastDailyRunOn) {
         this.lastDailyRunOn = lastDailyRunOn;
+    }
+
+    public String getTrainerNote() {
+        return trainerNote;
+    }
+
+    public void setTrainerNote(String trainerNote) {
+        this.trainerNote = trainerNote;
     }
 }

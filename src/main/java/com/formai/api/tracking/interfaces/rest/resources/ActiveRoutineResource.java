@@ -11,4 +11,5 @@ public record ActiveRoutineResource(UUID routineId,
                                     List<String> trainingDays,
                                     Integer todaySessionOrder,
                                     UUID todayWorkoutSessionId,
-                                    List<RoutineDayResource> sessions) { }
+                                    List<RoutineDayResource> sessions,
+                                    String trainerNote) { }

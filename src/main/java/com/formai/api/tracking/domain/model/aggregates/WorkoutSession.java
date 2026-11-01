@@ -52,6 +52,24 @@ public class WorkoutSession {
         return session;
     }
 
+    // Refreshes only a pending session with no recorded sets, keeping its identity and date.
+    // A started or closed workout remains a historical snapshot of its original prescription.
+    public boolean refreshPrescription(ActiveRoutine routine, RoutineDay day) {
+        if (!isUntouched()) {
+            return false;
+        }
+        var prescriptions = exercises.stream().map(SessionExercise::getToPerform).toList();
+        if (routineVersion == routine.getVersion() && dayOrder == day.order()
+                && dayLabel.equals(day.label()) && prescriptions.equals(day.exercises())) {
+            return false;
+        }
+        routineVersion = routine.getVersion();
+        dayOrder = day.order();
+        dayLabel = day.label();
+        exercises = day.exercises().stream().map(SessionExercise::planned).toList();
+        return true;
+    }
+
     public void recordSet(RecordSetCommand command) {
         ensurePending();
         exercise(command.exerciseId()).record(command.setNumber(), command.load(), command.reps(), Instant.now());

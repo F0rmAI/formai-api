@@ -27,6 +27,8 @@ public class ActiveRoutine {
     private ClientId clientId;
     private RoutineId routineId;
     private String routineName;
+    // The note the trainer left with the assignment (FR-033); null when there is none.
+    private String trainerNote;
     private int version;
     private LocalDate startDate;
     private LocalDate endDate;
@@ -51,6 +53,7 @@ public class ActiveRoutine {
     public void resync(PlannedRoutine plan) {
         this.routineId = plan.routineId();
         this.routineName = plan.routineName();
+        this.trainerNote = plan.trainerNote();
         this.version = plan.version();
         this.startDate = plan.startDate();
         this.endDate = null;
@@ -116,6 +119,14 @@ public class ActiveRoutine {
 
     public String getRoutineName() {
         return routineName;
+    }
+
+    public String getTrainerNote() {
+        return trainerNote;
+    }
+
+    public void setTrainerNote(String trainerNote) {
+        this.trainerNote = trainerNote;
     }
 
     public int getVersion() {

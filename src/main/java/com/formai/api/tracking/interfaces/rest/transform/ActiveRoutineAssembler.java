@@ -26,6 +26,7 @@ public interface ActiveRoutineAssembler {
     @Mapping(target = "version", source = "routine.version")
     @Mapping(target = "startDate", source = "routine.startDate")
     @Mapping(target = "trainingDays", source = "routine.trainingDays")
+    @Mapping(target = "trainerNote", source = "routine.trainerNote")
     @Mapping(target = "sessions", expression = "java(sessions(plan))")
     @Mapping(target = "todaySessionOrder", source = "todaySession", qualifiedByName = "todaySessionOrder")
     @Mapping(target = "todayWorkoutSessionId", source = "todaySession", qualifiedByName = "todayWorkoutSessionId")

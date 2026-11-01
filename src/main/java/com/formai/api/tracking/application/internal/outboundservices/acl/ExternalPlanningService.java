@@ -36,7 +36,8 @@ public class ExternalPlanningService {
                 snapshot.version(),
                 snapshot.startDate(),
                 snapshot.trainingDays().stream().map(DayOfWeek::valueOf).collect(Collectors.toSet()),
-                snapshot.sessions().stream().map(this::toRoutineDay).toList());
+                snapshot.sessions().stream().map(this::toRoutineDay).toList(),
+                snapshot.trainerNote());
     }
 
     private RoutineDay toRoutineDay(SessionSnapshot session) {

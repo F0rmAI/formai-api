@@ -52,7 +52,17 @@ public class WorkoutSessionCommandServiceImpl implements WorkoutSessionCommandSe
                     .map(routine -> routine.trainsOn(command.date())
                             && routine.getRoutineId().equals(session.getRoutineId()))
                     .orElse(false);
-            if (stillApplies || !session.isUntouched()) {
+            if (stillApplies) {
+                var routine = activeRoutine.orElseThrow();
+                var day = routine.getDays().stream()
+                        .filter(candidate -> candidate.order() == session.getDayOrder())
+                        .findFirst().orElseGet(() -> routine.nextDay(Optional.empty()));
+                if (session.refreshPrescription(routine, day)) {
+                    return Optional.of(workoutSessionRepository.save(session));
+                }
+                return existing;
+            }
+            if (!session.isUntouched()) {
                 return existing;
             }
             // Scheduled from a routine that no longer applies that day (replaced, ended, or now a
